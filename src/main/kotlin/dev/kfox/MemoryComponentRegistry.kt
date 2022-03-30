@@ -1,6 +1,6 @@
 package dev.kfox
 
-object MemoryComponentRegistry : ComponentRegistry {
+class MemoryComponentRegistry : ComponentRegistry {
     private val components = mutableMapOf<String, String>()
 
     override suspend fun save(buttonId: String, callbackId: String) {

@@ -7,7 +7,7 @@ import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.event.interaction.ButtonInteractionCreateEvent
 
-open class ButtonContext(
+sealed class ButtonContext(
     client: Kord,
     override val response: InteractionResponseBehavior,
     val event: ButtonInteractionCreateEvent,

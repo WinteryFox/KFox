@@ -4,11 +4,11 @@ import dev.kfox.ComponentRegistry
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
 
-open class CommandContext(
+sealed class CommandContext(
     val client: Kord, open val response: InteractionResponseBehavior, val componentRegistry: ComponentRegistry
 )
 
-open class ComponentContext(
+sealed class ComponentContext(
     val client: Kord,
     open val response: InteractionResponseBehavior,
     val componentRegistry: ComponentRegistry

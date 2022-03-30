@@ -4,13 +4,13 @@ import dev.kord.common.entity.Snowflake
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 
-data class ParameterData(
+internal data class ParameterData(
     val name: String?,
     val descriptionKey: String?,
     val parameter: KParameter
 )
 
-data class CommandNode(
+internal data class CommandNode(
     val name: String,
     val descriptionKey: String,
     //val category: Category,

@@ -7,7 +7,7 @@ import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.event.interaction.SelectMenuInteractionCreateEvent
 
-open class SelectMenuContext(
+sealed class SelectMenuContext(
     client: Kord,
     override val response: InteractionResponseBehavior,
     val event: SelectMenuInteractionCreateEvent,

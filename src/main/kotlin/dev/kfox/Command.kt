@@ -33,7 +33,7 @@ import kotlin.reflect.jvm.kotlinFunction
 suspend fun Kord.listen(
     `package`: String,
     applicationCommands: Flow<ApplicationCommand>,
-    componentRegistry: ComponentRegistry = MemoryComponentRegistry
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry()
 ): Job {
     val logger = KotlinLogging.logger {}
     val reflections = Reflections(
@@ -181,8 +181,6 @@ suspend fun Kord.listen(
                     if (supplied != null) return@associateWith supplied.value
 
                     when (parameter.parameter.type.classifier) {
-                        CommandContext::class -> CommandContext(kord, response, componentRegistry)
-                        ChatCommandContext::class -> ChatCommandContext(kord, response, this, componentRegistry)
                         PublicChatCommandContext::class -> PublicChatCommandContext(
                             kord, response as PublicMessageInteractionResponseBehavior, this, componentRegistry
                         )
@@ -204,7 +202,7 @@ suspend fun Kord.listen(
 @OptIn(ExperimentalContracts::class)
 suspend fun Kord.listen(
     `package`: String,
-    componentRegistry: ComponentRegistry = MemoryComponentRegistry,
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
     builder: suspend (Kord) -> Flow<ApplicationCommand>
 ): Job {
     contract {
@@ -215,7 +213,7 @@ suspend fun Kord.listen(
 }
 
 suspend fun Kord.listen(
-    `package`: String, componentRegistry: ComponentRegistry = MemoryComponentRegistry
+    `package`: String, componentRegistry: ComponentRegistry = MemoryComponentRegistry()
 ) = listen(`package`, componentRegistry) { globalCommands }
 
 context(ButtonBuilder.InteractionButtonBuilder, CommandContext) suspend fun register(callbackId: String) {

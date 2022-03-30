@@ -7,7 +7,7 @@ import dev.kord.core.behavior.interaction.response.MessageInteractionResponseBeh
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 
-open class ChatCommandContext(
+sealed class ChatCommandContext(
     client: Kord,
     override val response: MessageInteractionResponseBehavior,
     val event: ChatInputCommandInteractionCreateEvent,
