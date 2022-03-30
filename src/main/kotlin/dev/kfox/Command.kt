@@ -212,14 +212,17 @@ suspend fun Kord.listen(
     return listen(`package`, builder(this), componentRegistry)
 }
 
+@Suppress("unused")
 suspend fun Kord.listen(
     `package`: String, componentRegistry: ComponentRegistry = MemoryComponentRegistry()
 ) = listen(`package`, componentRegistry) { globalCommands }
 
-context(ButtonBuilder.InteractionButtonBuilder, CommandContext) suspend fun register(callbackId: String) {
+context(ButtonBuilder.InteractionButtonBuilder, CommandContext) @Suppress("unused")
+suspend fun register(callbackId: String) {
     componentRegistry.save(customId, callbackId)
 }
 
-context(SelectMenuBuilder, CommandContext) suspend fun register(callbackId: String) {
+context(SelectMenuBuilder, CommandContext) @Suppress("unused")
+suspend fun register(callbackId: String) {
     componentRegistry.save(customId, callbackId)
 }

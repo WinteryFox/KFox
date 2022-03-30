@@ -10,6 +10,7 @@ import dev.kord.core.event.interaction.ButtonInteractionCreateEvent
 sealed class ButtonContext(
     client: Kord,
     override val response: InteractionResponseBehavior,
+    @Suppress("unused")
     val event: ButtonInteractionCreateEvent,
     componentRegistry: ComponentRegistry
 ) : ComponentContext(client, response, componentRegistry)

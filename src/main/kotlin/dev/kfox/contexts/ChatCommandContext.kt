@@ -10,6 +10,7 @@ import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 sealed class ChatCommandContext(
     client: Kord,
     override val response: MessageInteractionResponseBehavior,
+    @Suppress("unused")
     val event: ChatInputCommandInteractionCreateEvent,
     componentRegistry: ComponentRegistry
 ) : CommandContext(client, response, componentRegistry)
