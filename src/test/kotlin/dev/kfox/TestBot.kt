@@ -3,7 +3,6 @@ package dev.kfox
 import dev.kord.common.annotation.KordExperimental
 import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
-import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
@@ -35,7 +34,7 @@ class TestBot {
     @Test
     fun testBot() = runBlocking {
         client.listen("dev.kfox") {
-            it.getGuildApplicationCommands(Snowflake(809278232100077629)).toList()
+            it.getGuildApplicationCommands(Snowflake(809278232100077629))
         }
 
         client.login()
