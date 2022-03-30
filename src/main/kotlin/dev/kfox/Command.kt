@@ -1,12 +1,18 @@
 package dev.kfox
 
-import dev.kord.common.entity.*
+import dev.kfox.contexts.*
+import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.ComponentType
+import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
+import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
+import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.entity.application.ApplicationCommand
-import dev.kord.core.entity.interaction.*
-import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
-import dev.kord.core.event.interaction.InteractionCreateEvent
+import dev.kord.core.entity.interaction.StringOptionValue
+import dev.kord.core.event.interaction.*
 import dev.kord.core.on
+import dev.kord.rest.builder.component.ButtonBuilder
+import dev.kord.rest.builder.component.SelectMenuBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
@@ -15,105 +21,145 @@ import mu.KotlinLogging
 import org.reflections.Reflections
 import org.reflections.scanners.Scanners
 import org.reflections.util.ConfigurationBuilder
-import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
+import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.kotlinFunction
 
-@Target(AnnotationTarget.FUNCTION)
-annotation class Command(
-    val name: String,
-    val descriptionKey: String,
-    //val category: Category,
-    val applicationIds: LongArray = [],
-    val ephemeral: Boolean = false,
-)
-
-@Target(AnnotationTarget.FUNCTION)
-annotation class SubCommand(
-    val parent: String
-)
-
-@Target(AnnotationTarget.VALUE_PARAMETER)
-annotation class Parameter(
-    val name: String,
-    val descriptionKey: String
-)
-
-class CommandContext(
-    val event: InteractionCreateEvent,
-    val client: Kord
-)
-
-data class ParameterData(
-    val name: String?,
-    val descriptionKey: String?,
-    val parameter: KParameter
-)
-
-data class CommandNode(
-    val name: String,
-    val descriptionKey: String,
-    //val category: Category,
-    val ephemeral: Boolean,
-    val executor: KFunction<*>,
-    val applicationIds: List<Snowflake>,
-    val parameters: Map<String, ParameterData> = emptyMap(),
-    val parent: String? = null,
-    val children: List<CommandNode> = emptyList()
-)
-
-suspend fun Kord.listen(`package`: String, applicationCommands: Flow<ApplicationCommand>): Job {
+@OptIn(KordUnsafe::class)
+suspend fun Kord.listen(
+    `package`: String,
+    applicationCommands: Flow<ApplicationCommand>,
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry
+): Job {
     val logger = KotlinLogging.logger {}
-    val localCommands =
-        Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
-            .getMethodsAnnotatedWith(Command::class.java)
-            .map { it.kotlinFunction!! }
-            .map { function ->
-                val annotation = function.findAnnotation<Command>()!!
-                val parent = function.findAnnotation<SubCommand>()?.parent
+    val reflections = Reflections(
+        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+    )
 
-                CommandNode(
-                    annotation.name,
-                    annotation.descriptionKey,
-                    //annotation.category,
+    val localCommands =
+        reflections.getMethodsAnnotatedWith(Command::class.java).map { it.kotlinFunction!! }.map { function ->
+            val annotation = function.findAnnotation<Command>()!!
+            val parent = function.findAnnotation<SubCommand>()?.parent
+
+            CommandNode(annotation.name,
+                annotation.descriptionKey,
+                //annotation.category,
+                annotation.ephemeral,
+                function,
+                annotation.applicationIds.map { Snowflake(it) },
+                function.parameters.map {
+                    val p = it.findAnnotation<Parameter>()
+                    ParameterData(p?.name, p?.descriptionKey, it)
+                }.associateBy { it.parameter.name!! },
+                parent
+            )
+        }
+
+    val localComponentCallbacks =
+        reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }.associate { function ->
+            val annotation = function.findAnnotation<Button>()!!
+
+            annotation.callbackId to ComponentCallback(
+                annotation.callbackId,
+                annotation.ephemeral,
+                function,
+                ComponentType.Button
+            )
+        } + reflections.getMethodsAnnotatedWith(SelectMenu::class.java).map { it.kotlinFunction!! }
+            .associate { function ->
+                val annotation = function.findAnnotation<SelectMenu>()!!
+
+                annotation.callbackId to ComponentCallback(
+                    annotation.callbackId,
                     annotation.ephemeral,
                     function,
-                    annotation.applicationIds.map { Snowflake(it) },
-                    function.parameters
-                        .map {
-                            val p = it.findAnnotation<Parameter>()
-                            ParameterData(p?.name, p?.descriptionKey, it)
-                        }
-                        .associateBy { it.parameter.name!! },
-                    parent
+                    ComponentType.SelectMenu
                 )
             }
 
-    val commands = applicationCommands
-        .filter { command ->
-            val localCommand =
-                localCommands.find { it.name == command.name }
+    val commands = applicationCommands.filter { command ->
+        val localCommand = localCommands.find { it.name == command.name }
 
-            if (localCommand == null) {
-                logger.warn { "Command \"${command.name}\" is not locally defined, skipping." }
-                false
-            } else {
-                true
-            }
+        if (localCommand == null) {
+            logger.warn { "Command \"${command.name}\" is not locally defined, skipping." }
+            false
+        } else {
+            true
         }
-        .toList()
-        .associate { command ->
-            // TODO: Create missing commands with PUT (or however we end up doing it)
-            val localCommand =
-                localCommands.find { it.name == command.name }!! // TODO: Create missing commands?
+    }.toList().associate { command ->
+        // TODO: Create missing commands with PUT (or however we end up doing it)
+        val localCommand = localCommands.find { it.name == command.name }!! // TODO: Create missing commands?
 
-            command.id to localCommand
-        }
+        command.id to localCommand
+    }
 
     return on<InteractionCreateEvent> {
         when (this) {
+            is ComponentInteractionCreateEvent -> {
+                val callbackId = componentRegistry.get(interaction.componentId)
+
+                if (callbackId == null) {
+                    logger.debug { "Callback for component ${interaction.componentId} is not registered, did you forget to call `register` in the builder?" }
+                    return@on
+                }
+
+                val callback = localComponentCallbacks[callbackId]
+
+                if (callback == null) {
+                    logger.debug { "Callback for component ${interaction.componentId} is not defined." }
+                    return@on
+                }
+
+                val response = if (callback.ephemeral)
+                    interaction.deferEphemeralResponseUnsafe()
+                else
+                    interaction.deferPublicResponseUnsafe()
+
+                callback.function.callSuspend(
+                    when (callback.type) {
+                        ComponentType.Button -> {
+                            if (callback.ephemeral)
+                                EphemeralButtonContext(
+                                    kord,
+                                    response as EphemeralMessageInteractionResponseBehavior,
+                                    this as ButtonInteractionCreateEvent,
+                                    componentRegistry
+                                )
+                            else
+                                PublicButtonContext(
+                                    kord,
+                                    response as PublicMessageInteractionResponseBehavior,
+                                    this as ButtonInteractionCreateEvent,
+                                    componentRegistry
+                                )
+                        }
+
+                        ComponentType.SelectMenu -> {
+                            if (callback.ephemeral)
+                                EphemeralSelectMenuContext(
+                                    kord,
+                                    response as EphemeralMessageInteractionResponseBehavior,
+                                    this as SelectMenuInteractionCreateEvent,
+                                    componentRegistry
+                                )
+                            else
+                                PublicSelectMenuContext(
+                                    kord,
+                                    response as PublicMessageInteractionResponseBehavior,
+                                    this as SelectMenuInteractionCreateEvent,
+                                    componentRegistry
+                                )
+                        }
+
+                        else -> error("...?")  // TODO
+                    }
+                )
+            }
+
             is ChatInputCommandInteractionCreateEvent -> {
                 val localCommand = commands[interaction.command.rootId]
                     ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
@@ -126,30 +172,56 @@ suspend fun Kord.listen(`package`: String, applicationCommands: Flow<Application
                 }
 
                 // Acknowledge we have received, and we have such a command registered and are now processing
-                kord.rest.interaction.deferMessage(
-                    interaction.id, interaction.token, localCommand.ephemeral
-                )
+                val response = if (localCommand.ephemeral) interaction.deferEphemeralResponseUnsafe()
+                else interaction.deferPublicResponseUnsafe()
 
                 // (Attempt to) Fill parameters for call of actual command
-                localCommand.executor.callSuspendBy(localCommand.parameters.values
-                    .associateWith { parameter ->
-                        val supplied = suppliedParameters.entries.find { parameter.name == it.key }?.value
-                        if (supplied != null)
-                            return@associateWith supplied.value
+                localCommand.executor.callSuspendBy(localCommand.parameters.values.associateWith { parameter ->
+                    val supplied = suppliedParameters.entries.find { parameter.name == it.key }?.value
+                    if (supplied != null) return@associateWith supplied.value
 
-                        when (parameter.parameter.type.classifier) {
-                            CommandContext::class -> CommandContext(this, kord)
-                            else -> if (parameter.parameter.isOptional) null else throw IllegalArgumentException()
-                        }
-                    }.mapKeys { it.key.parameter })
+                    when (parameter.parameter.type.classifier) {
+                        CommandContext::class -> CommandContext(kord, response, componentRegistry)
+                        ChatCommandContext::class -> ChatCommandContext(kord, response, this, componentRegistry)
+                        PublicChatCommandContext::class -> PublicChatCommandContext(
+                            kord, response as PublicMessageInteractionResponseBehavior, this, componentRegistry
+                        )
+                        EphemeralChatCommandContext::class -> EphemeralChatCommandContext(
+                            kord,
+                            response as EphemeralMessageInteractionResponseBehavior,
+                            this,
+                            componentRegistry
+                        )
+                        else -> if (parameter.parameter.isOptional) null else throw IllegalArgumentException()
+                    }
+                }.mapKeys { it.key.parameter })
             }
             else -> TODO()
         }
     }
 }
 
-suspend fun Kord.listen(`package`: String, builder: suspend (Kord) -> Flow<ApplicationCommand>) =
-    listen(`package`, builder(this))
+@OptIn(ExperimentalContracts::class)
+suspend fun Kord.listen(
+    `package`: String,
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry,
+    builder: suspend (Kord) -> Flow<ApplicationCommand>
+): Job {
+    contract {
+        callsInPlace(builder, InvocationKind.EXACTLY_ONCE)
+    }
 
-suspend fun Kord.listen(`package`: String) =
-    listen(`package`) { globalCommands }
+    return listen(`package`, builder(this), componentRegistry)
+}
+
+suspend fun Kord.listen(
+    `package`: String, componentRegistry: ComponentRegistry = MemoryComponentRegistry
+) = listen(`package`, componentRegistry) { globalCommands }
+
+context(ButtonBuilder.InteractionButtonBuilder, CommandContext) suspend fun register(callbackId: String) {
+    componentRegistry.save(customId, callbackId)
+}
+
+context(SelectMenuBuilder, CommandContext) suspend fun register(callbackId: String) {
+    componentRegistry.save(customId, callbackId)
+}
