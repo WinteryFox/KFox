@@ -8,6 +8,8 @@ import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.InteractionCreateEvent
 import dev.kord.core.on
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.toList
 import mu.KotlinLogging
 import org.reflections.Reflections
@@ -62,7 +64,7 @@ data class CommandNode(
     val children: List<CommandNode> = emptyList()
 )
 
-suspend fun Kord.listen(`package`: String, applicationCommands: List<ApplicationCommand>): Job {
+suspend fun Kord.listen(`package`: String, applicationCommands: Flow<ApplicationCommand>): Job {
     val logger = KotlinLogging.logger {}
     val localCommands =
         Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
@@ -101,6 +103,7 @@ suspend fun Kord.listen(`package`: String, applicationCommands: List<Application
                 true
             }
         }
+        .toList()
         .associate { command ->
             // TODO: Create missing commands with PUT (or however we end up doing it)
             val localCommand =
@@ -130,7 +133,6 @@ suspend fun Kord.listen(`package`: String, applicationCommands: List<Application
                 // (Attempt to) Fill parameters for call of actual command
                 localCommand.executor.callSuspendBy(localCommand.parameters.values
                     .associateWith { parameter ->
-                        //val supplied = suppliedParameters.find { parameter.name == it.name }?.value
                         val supplied = suppliedParameters.entries.find { parameter.name == it.key }?.value
                         if (supplied != null)
                             return@associateWith supplied.value
@@ -146,8 +148,8 @@ suspend fun Kord.listen(`package`: String, applicationCommands: List<Application
     }
 }
 
-suspend fun Kord.listen(`package`: String, builder: suspend (Kord) -> List<ApplicationCommand>) =
+suspend fun Kord.listen(`package`: String, builder: suspend (Kord) -> Flow<ApplicationCommand>) =
     listen(`package`, builder(this))
 
 suspend fun Kord.listen(`package`: String) =
-    listen(`package`) { globalCommands.toList() }
+    listen(`package`) { globalCommands }
