@@ -21,10 +21,13 @@ It will allow you to easily create and respond to any type of interaction that K
     - [x] Parameters
     - [x] Sub-commands
     - [x] Groups
+    - [ ] User commands
+    - [ ] Message commands
+    - [ ] Autocomplete
     - [ ] Localization
 - [x] Buttons
 - [x] Select menus
-- [ ] Modals
+- [x] Modals
 
 ## Installation
 
