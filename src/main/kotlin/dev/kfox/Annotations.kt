@@ -12,6 +12,12 @@ annotation class SubCommand(
     val group: String = ""
 )
 
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class Parameter(
+    val name: String, // TODO: Localize these two
+    val description: String
+)
+
 @Target(AnnotationTarget.FUNCTION)
 annotation class Button(
     val callbackId: String
@@ -22,8 +28,7 @@ annotation class SelectMenu(
     val callbackId: String
 )
 
-@Target(AnnotationTarget.VALUE_PARAMETER)
-annotation class Parameter(
-    val name: String, // TODO: Localize these two
-    val description: String
+@Target(AnnotationTarget.FUNCTION)
+annotation class Modal(
+    val callbackId: String
 )

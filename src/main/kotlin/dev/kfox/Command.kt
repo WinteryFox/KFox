@@ -2,20 +2,23 @@ package dev.kfox
 
 import dev.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
-import dev.kord.common.entity.ComponentType
 import dev.kord.core.Kord
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.StringOptionValue
+import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
-import dev.kord.core.on
+import dev.kord.core.kordLogger
 import dev.kord.rest.builder.component.ButtonBuilder
 import dev.kord.rest.builder.component.SelectMenuBuilder
+import dev.kord.rest.builder.interaction.ModalBuilder
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import mu.KLogger
 import mu.KotlinLogging
 import org.reflections.Reflections
 import org.reflections.scanners.Scanners
@@ -28,10 +31,33 @@ import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.kotlinFunction
 
-suspend fun Kord.listen(
+internal suspend inline fun getCallback(
+    logger: KLogger,
+    localComponentCallbacks: Map<String, ComponentCallback>,
+    registry: ComponentRegistry,
+    id: String
+): ComponentCallback? {
+    val callbackId = registry.get(id)
+    if (callbackId == null) {
+        logger.debug { "Callback for component $id is not registered, did you forget to call `register` in the builder?" }
+        return null
+    }
+
+    val callback = localComponentCallbacks[callbackId]
+    if (callback == null) {
+        logger.debug { "Callback for component $id is not defined." }
+        return null
+    }
+
+    return callback
+}
+
+suspend fun listen(
+    events: Flow<Event>,
     `package`: String,
     applicationCommands: Flow<ApplicationCommand>,
-    registry: ComponentRegistry = MemoryComponentRegistry()
+    scope: CoroutineScope,
+    registry: ComponentRegistry = MemoryComponentRegistry(),
 ): Job {
     val logger = KotlinLogging.logger {}
     val reflections = Reflections(
@@ -39,27 +65,27 @@ suspend fun Kord.listen(
     )
 
     val localCommands: MutableList<CommandNode> = mutableListOf()
-        reflections.getMethodsAnnotatedWith(Command::class.java)
-            .map { it.kotlinFunction!! }
-            .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
-            .map { function ->
-                val annotation = function.findAnnotation<Command>()!!
-                val subCommand = function.findAnnotation<SubCommand>()
+    reflections.getMethodsAnnotatedWith(Command::class.java)
+        .map { it.kotlinFunction!! }
+        .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
+        .map { function ->
+            val annotation = function.findAnnotation<Command>()!!
+            val subCommand = function.findAnnotation<SubCommand>()
 
-                val node = CommandNode(
-                    annotation.name,
-                    annotation.description,
-                    function,
-                    function.parameters.map {
-                        val p = it.findAnnotation<Parameter>()
-                        ParameterData(p?.name, p?.description, it)
-                    }.associateBy { it.parameter.name!! },
-                    subCommand?.group,
-                    subCommand?.parent
-                )
+            val node = CommandNode(
+                annotation.name,
+                annotation.description,
+                function,
+                function.parameters.map {
+                    val p = it.findAnnotation<Parameter>()
+                    ParameterData(p?.name, p?.description, it)
+                }.associateBy { it.parameter.name!! },
+                subCommand?.group,
+                subCommand?.parent
+            )
 
-                localCommands.add(node)
-            }
+            localCommands.add(node)
+        }
 
     val localComponentCallbacks =
         reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }.associate { function ->
@@ -67,19 +93,27 @@ suspend fun Kord.listen(
 
             annotation.callbackId to ComponentCallback(
                 annotation.callbackId,
-                function,
-                ComponentType.Button
+                function
             )
-        } + reflections.getMethodsAnnotatedWith(SelectMenu::class.java).map { it.kotlinFunction!! }
-            .associate { function ->
-                val annotation = function.findAnnotation<SelectMenu>()!!
+        } +
+                reflections.getMethodsAnnotatedWith(SelectMenu::class.java).map { it.kotlinFunction!! }
+                    .associate { function ->
+                        val annotation = function.findAnnotation<SelectMenu>()!!
 
-                annotation.callbackId to ComponentCallback(
-                    annotation.callbackId,
-                    function,
-                    ComponentType.SelectMenu
-                )
-            }
+                        annotation.callbackId to ComponentCallback(
+                            annotation.callbackId,
+                            function
+                        )
+                    } +
+                reflections.getMethodsAnnotatedWith(Modal::class.java).map { it.kotlinFunction!! }
+                    .associate { function ->
+                        val annotation = function.findAnnotation<Modal>()!!
+
+                        annotation.callbackId to ComponentCallback(
+                            annotation.callbackId,
+                            function
+                        )
+                    }
 
     val commands = applicationCommands.filter { command ->
         val localCommand = localCommands.find { it.name == command.name || it.parent == command.name }
@@ -92,73 +126,94 @@ suspend fun Kord.listen(
         }
     }.toList().associate { command ->
         // TODO: Create missing commands with PUT (or however we end up doing it)
-        val localCommand = localCommands.filter { it.name == command.name || it.parent == command.name } // TODO: Create missing commands?
+        val localCommand =
+            localCommands.filter { it.name == command.name || it.parent == command.name } // TODO: Create missing commands?
 
         command.id to localCommand
     }.filterValues { it.isNotEmpty() }
 
-    return on<InteractionCreateEvent> {
-        when (this) {
-            is ComponentInteractionCreateEvent -> {
-                val callbackId = registry.get(interaction.componentId)
+    return events.buffer(Channel.UNLIMITED)
+        .filterIsInstance<InteractionCreateEvent>()
+        .onEach { event ->
+            scope.launch(event.coroutineContext) {
+                runCatching {
+                    with(event) {
+                        when (this) {
+                            is ModalSubmitInteractionCreateEvent -> {
+                                val callback =
+                                    getCallback(logger, localComponentCallbacks, registry, interaction.modalId)
+                                        ?: return@runCatching
 
-                if (callbackId == null) {
-                    logger.debug { "Callback for component ${interaction.componentId} is not registered, did you forget to call `register` in the builder?" }
-                    return@on
-                }
+                                callback.function.callSuspendByParameters(
+                                    kord,
+                                    registry,
+                                    this,
+                                    emptyMap()
+                                )
+                            }
+                            is ComponentInteractionCreateEvent -> {
+                                val callback =
+                                    getCallback(logger, localComponentCallbacks, registry, interaction.componentId)
+                                        ?: return@runCatching
 
-                val callback = localComponentCallbacks[callbackId]
+                                callback.function.callSuspendByParameters(
+                                    kord,
+                                    registry,
+                                    this,
+                                    emptyMap()
+                                )
+                            }
+                            is ChatInputCommandInteractionCreateEvent -> {
+                                val matchedCommands = commands[interaction.command.rootId]
+                                    ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
 
-                if (callback == null) {
-                    logger.debug { "Callback for component ${interaction.componentId} is not defined." }
-                    return@on
-                }
+                                val localCommand = when (val command = interaction.command) {
+                                    is dev.kord.core.entity.interaction.SubCommand -> {
+                                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == null }
+                                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
+                                    }
+                                    is GroupCommand -> {
+                                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == command.groupName }
+                                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
+                                    }
+                                    else -> {
+                                        matchedCommands.first()
+                                    }
+                                }
 
-                callback.function.callSuspendByParameters(
-                    kord,
-                    registry,
-                    this,
-                    emptyMap()
-                )
+                                val suppliedParameters = interaction.command.options.mapValues {
+                                    when (it.value) {
+                                        is StringOptionValue -> StringOptionValue(
+                                            (it.value.value as String).trim(),
+                                            it.value.focused
+                                        )
+                                        else -> it.value
+                                    }
+                                }
+
+                                localCommand.function.callSuspendByParameters(
+                                    kord,
+                                    registry,
+                                    this,
+                                    suppliedParameters,
+                                    localCommand.parameters
+                                )
+                            }
+                            else -> TODO()
+                        }
+                    }
+                }.onFailure { kordLogger.catching(it) }
             }
-
-            is ChatInputCommandInteractionCreateEvent -> {
-                val matchedCommands = commands[interaction.command.rootId]
-                    ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
-
-                val localCommand = when (val command = interaction.command) {
-                    is dev.kord.core.entity.interaction.SubCommand -> {
-                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == null }
-                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
-                    }
-                    is GroupCommand -> {
-                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == command.groupName }
-                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
-                    }
-                    else -> {
-                        matchedCommands.first()
-                    }
-                }
-
-                val suppliedParameters = interaction.command.options.mapValues {
-                    when (it.value) {
-                        is StringOptionValue -> StringOptionValue((it.value.value as String).trim(), it.value.focused)
-                        else -> it.value
-                    }
-                }
-
-                localCommand.function.callSuspendByParameters(
-                    kord,
-                    registry,
-                    this,
-                    suppliedParameters,
-                    localCommand.parameters
-                )
-            }
-            else -> TODO()
         }
-    }
+        .launchIn(scope)
 }
+
+suspend fun Kord.listen(
+    `package`: String,
+    applicationCommands: Flow<ApplicationCommand>,
+    registry: ComponentRegistry = MemoryComponentRegistry(),
+    scope: CoroutineScope = this,
+): Job = listen(events, `package`, applicationCommands, scope, registry)
 
 @OptIn(KordUnsafe::class)
 internal suspend fun KFunction<*>.callSuspendByParameters(
@@ -178,6 +233,12 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
                 return@associateWith supplied.value
 
             when (parameter.type.classifier) {
+                ChatCommandContext::class ->
+                    ChatCommandContext(
+                        kord,
+                        event as ChatInputCommandInteractionCreateEvent,
+                        registry
+                    )
                 PublicChatCommandContext::class ->
                     PublicChatCommandContext(
                         kord,
@@ -190,6 +251,12 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
                         kord,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
+                        registry
+                    )
+                ButtonContext::class ->
+                    ButtonContext(
+                        kord,
+                        event as ButtonInteractionCreateEvent,
                         registry
                     )
                 PublicButtonContext::class ->
@@ -206,6 +273,12 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
                         event,
                         registry
                     )
+                SelectMenuContext::class ->
+                    SelectMenuContext(
+                        kord,
+                        event as SelectMenuInteractionCreateEvent,
+                        registry
+                    )
                 PublicSelectMenuContext::class ->
                     PublicSelectMenuContext(
                         kord,
@@ -217,6 +290,26 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
                     EphemeralSelectMenuContext(
                         kord,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                ModalContext::class ->
+                    ModalContext(
+                        kord,
+                        event as ModalSubmitInteractionCreateEvent,
+                        registry
+                    )
+                PublicModalContext::class ->
+                    PublicModalContext(
+                        kord,
+                        (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                EphemeralModalContext::class ->
+                    EphemeralModalContext(
+                        kord,
+                        (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
                     )
@@ -253,6 +346,11 @@ suspend fun register(callbackId: String) {
 }
 
 context(SelectMenuBuilder, CommandContext) @Suppress("unused")
+suspend fun register(callbackId: String) {
+    registry.save(customId, callbackId)
+}
+
+context(ModalBuilder, CommandContext) @Suppress("unused")
 suspend fun register(callbackId: String) {
     registry.save(customId, callbackId)
 }

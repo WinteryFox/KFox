@@ -1,17 +1,26 @@
 package dev.kfox
 
-import dev.kfox.contexts.PublicButtonContext
-import dev.kfox.contexts.PublicChatCommandContext
-import dev.kfox.contexts.PublicSelectMenuContext
+import dev.kfox.contexts.*
 import dev.kord.common.entity.Snowflake
+import dev.kord.common.entity.TextInputStyle
 import dev.kord.core.Kord
+import dev.kord.core.behavior.interaction.modal
 import dev.kord.core.behavior.interaction.response.createPublicFollowup
-import dev.kord.rest.builder.message.create.actionRow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
 const val BUTTON_CALLBACK = "button"
 const val MENU_CALLBACK = "menu"
+const val MODAL_CALLBACK = "modal"
+
+@Modal(MODAL_CALLBACK)
+suspend fun modal(
+    context: PublicModalContext
+) = with(context) {
+    response.createPublicFollowup {
+        content = "Your beautiful poem reads; ${event.interaction.textInputs["bbb"]?.value}"
+    }
+}
 
 @Button(BUTTON_CALLBACK)
 suspend fun testButton(
@@ -49,24 +58,19 @@ suspend fun testSub(
 
 @Command("parrot", "parrot-key")
 suspend fun testCommand(
-    context: PublicChatCommandContext,
+    context: ChatCommandContext,
     @Parameter("content", "content-key")
     value: String
 ) {
     with(context) {
-        response.createPublicFollowup {
-            content = "Hi, I'm a friendly parakeet! You said \"$value,\" awk!"
+        event.interaction.modal("Hello!", "aaa") {
             actionRow {
-                selectMenu("menuId") {
-                    placeholder = "Select your favourite food!"
-                    option("Foxes", "foxes")
-                    option("Bunnies", "amys")
-                    option("Cats", "cats")
-                    option("Dogs", "dogs")
-
-                    register(MENU_CALLBACK)
+                textInput(TextInputStyle.Short, "bbb", "Poetry night") {
+                    placeholder = "Let out your inner Shakespeare"
                 }
             }
+
+            register(MODAL_CALLBACK)
         }
     }
 }

@@ -1,2 +1,2 @@
-rootProject.name = "KFox"
+rootProject.name = "kfox"
 
