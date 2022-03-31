@@ -12,19 +12,19 @@ sealed class ChatCommandContext(
     override val response: MessageInteractionResponseBehavior,
     @Suppress("unused")
     val event: ChatInputCommandInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : CommandContext(client, response, componentRegistry)
+    registry: ComponentRegistry
+) : CommandContext(client, response, registry)
 
 class PublicChatCommandContext(
     client: Kord,
     override val response: PublicMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ChatCommandContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : ChatCommandContext(client, response, event, registry)
 
 class EphemeralChatCommandContext(
     client: Kord,
     override val response: EphemeralMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ChatCommandContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : ChatCommandContext(client, response, event, registry)

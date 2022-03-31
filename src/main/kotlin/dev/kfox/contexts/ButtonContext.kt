@@ -12,19 +12,19 @@ sealed class ButtonContext(
     override val response: InteractionResponseBehavior,
     @Suppress("unused")
     val event: ButtonInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ComponentContext(client, response, componentRegistry)
+    registry: ComponentRegistry
+) : ComponentContext(client, response, registry)
 
 class PublicButtonContext(
     client: Kord,
     override val response: PublicMessageInteractionResponseBehavior,
     event: ButtonInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ButtonContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : ButtonContext(client, response, event, registry)
 
 class EphemeralButtonContext(
     client: Kord,
     override val response: EphemeralMessageInteractionResponseBehavior,
     event: ButtonInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ButtonContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : ButtonContext(client, response, event, registry)

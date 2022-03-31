@@ -11,19 +11,19 @@ sealed class SelectMenuContext(
     client: Kord,
     override val response: InteractionResponseBehavior,
     val event: SelectMenuInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : ComponentContext(client, response, componentRegistry)
+    registry: ComponentRegistry
+) : ComponentContext(client, response, registry)
 
 class PublicSelectMenuContext(
     client: Kord,
     override val response: PublicMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : SelectMenuContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : SelectMenuContext(client, response, event, registry)
 
 class EphemeralSelectMenuContext(
     client: Kord,
     override val response: EphemeralMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
-    componentRegistry: ComponentRegistry
-) : SelectMenuContext(client, response, event, componentRegistry)
+    registry: ComponentRegistry
+) : SelectMenuContext(client, response, event, registry)

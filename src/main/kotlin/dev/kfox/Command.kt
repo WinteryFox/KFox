@@ -3,11 +3,9 @@ package dev.kfox
 import dev.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.ComponentType
-import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
-import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
-import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.entity.application.ApplicationCommand
+import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.StringOptionValue
 import dev.kord.core.event.interaction.*
 import dev.kord.core.on
@@ -24,16 +22,15 @@ import org.reflections.util.ConfigurationBuilder
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
-import kotlin.reflect.full.callSuspend
+import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.kotlinFunction
 
-@OptIn(KordUnsafe::class)
 suspend fun Kord.listen(
     `package`: String,
     applicationCommands: Flow<ApplicationCommand>,
-    componentRegistry: ComponentRegistry = MemoryComponentRegistry()
+    registry: ComponentRegistry = MemoryComponentRegistry()
 ): Job {
     val logger = KotlinLogging.logger {}
     val reflections = Reflections(
@@ -46,14 +43,11 @@ suspend fun Kord.listen(
             val parent = function.findAnnotation<SubCommand>()?.parent
 
             CommandNode(annotation.name,
-                annotation.descriptionKey,
-                //annotation.category,
-                annotation.ephemeral,
+                annotation.description,
                 function,
-                annotation.applicationIds.map { Snowflake(it) },
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.descriptionKey, it)
+                    ParameterData(p?.name, p?.description, it)
                 }.associateBy { it.parameter.name!! },
                 parent
             )
@@ -65,7 +59,6 @@ suspend fun Kord.listen(
 
             annotation.callbackId to ComponentCallback(
                 annotation.callbackId,
-                annotation.ephemeral,
                 function,
                 ComponentType.Button
             )
@@ -75,7 +68,6 @@ suspend fun Kord.listen(
 
                 annotation.callbackId to ComponentCallback(
                     annotation.callbackId,
-                    annotation.ephemeral,
                     function,
                     ComponentType.SelectMenu
                 )
@@ -100,7 +92,7 @@ suspend fun Kord.listen(
     return on<InteractionCreateEvent> {
         when (this) {
             is ComponentInteractionCreateEvent -> {
-                val callbackId = componentRegistry.get(interaction.componentId)
+                val callbackId = registry.get(interaction.componentId)
 
                 if (callbackId == null) {
                     logger.debug { "Callback for component ${interaction.componentId} is not registered, did you forget to call `register` in the builder?" }
@@ -114,49 +106,11 @@ suspend fun Kord.listen(
                     return@on
                 }
 
-                val response = if (callback.ephemeral)
-                    interaction.deferEphemeralResponseUnsafe()
-                else
-                    interaction.deferPublicResponseUnsafe()
-
-                callback.function.callSuspend(
-                    when (callback.type) {
-                        ComponentType.Button -> {
-                            if (callback.ephemeral)
-                                EphemeralButtonContext(
-                                    kord,
-                                    response as EphemeralMessageInteractionResponseBehavior,
-                                    this as ButtonInteractionCreateEvent,
-                                    componentRegistry
-                                )
-                            else
-                                PublicButtonContext(
-                                    kord,
-                                    response as PublicMessageInteractionResponseBehavior,
-                                    this as ButtonInteractionCreateEvent,
-                                    componentRegistry
-                                )
-                        }
-
-                        ComponentType.SelectMenu -> {
-                            if (callback.ephemeral)
-                                EphemeralSelectMenuContext(
-                                    kord,
-                                    response as EphemeralMessageInteractionResponseBehavior,
-                                    this as SelectMenuInteractionCreateEvent,
-                                    componentRegistry
-                                )
-                            else
-                                PublicSelectMenuContext(
-                                    kord,
-                                    response as PublicMessageInteractionResponseBehavior,
-                                    this as SelectMenuInteractionCreateEvent,
-                                    componentRegistry
-                                )
-                        }
-
-                        else -> error("...?")  // TODO
-                    }
+                callback.function.callSuspendByParameters(
+                    kord,
+                    registry,
+                    this,
+                    emptyMap()
                 )
             }
 
@@ -171,32 +125,86 @@ suspend fun Kord.listen(
                     }
                 }
 
-                // Acknowledge we have received, and we have such a command registered and are now processing
-                val response = if (localCommand.ephemeral) interaction.deferEphemeralResponseUnsafe()
-                else interaction.deferPublicResponseUnsafe()
-
-                // (Attempt to) Fill parameters for call of actual command
-                localCommand.executor.callSuspendBy(localCommand.parameters.values.associateWith { parameter ->
-                    val supplied = suppliedParameters.entries.find { parameter.name == it.key }?.value
-                    if (supplied != null) return@associateWith supplied.value
-
-                    when (parameter.parameter.type.classifier) {
-                        PublicChatCommandContext::class -> PublicChatCommandContext(
-                            kord, response as PublicMessageInteractionResponseBehavior, this, componentRegistry
-                        )
-                        EphemeralChatCommandContext::class -> EphemeralChatCommandContext(
-                            kord,
-                            response as EphemeralMessageInteractionResponseBehavior,
-                            this,
-                            componentRegistry
-                        )
-                        else -> if (parameter.parameter.isOptional) null else throw IllegalArgumentException()
-                    }
-                }.mapKeys { it.key.parameter })
+                localCommand.function.callSuspendByParameters(
+                    kord,
+                    registry,
+                    this,
+                    suppliedParameters,
+                    localCommand.parameters
+                )
             }
             else -> TODO()
         }
     }
+}
+
+@OptIn(KordUnsafe::class)
+internal suspend fun KFunction<*>.callSuspendByParameters(
+    kord: Kord,
+    registry: ComponentRegistry,
+    event: InteractionCreateEvent,
+    suppliedParameters: Map<String, OptionValue<Any?>>,
+    commandParameters: Map<String, ParameterData> = emptyMap(),
+) {
+    callSuspendBy(
+        parameters.associateWith { parameter ->
+            val supplied = suppliedParameters.entries.find {
+                it.key == (commandParameters[parameter.name]?.name ?: parameter.name)
+            }?.value
+
+            if (supplied != null)
+                return@associateWith supplied.value
+
+            when (parameter.type.classifier) {
+                PublicChatCommandContext::class ->
+                    PublicChatCommandContext(
+                        kord,
+                        (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                EphemeralChatCommandContext::class ->
+                    EphemeralChatCommandContext(
+                        kord,
+                        (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                PublicButtonContext::class ->
+                    PublicButtonContext(
+                        kord,
+                        (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                EphemeralButtonContext::class ->
+                    EphemeralButtonContext(
+                        kord,
+                        (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                PublicSelectMenuContext::class ->
+                    PublicSelectMenuContext(
+                        kord,
+                        (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                EphemeralSelectMenuContext::class ->
+                    EphemeralSelectMenuContext(
+                        kord,
+                        (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                        event,
+                        registry
+                    )
+                else -> if (parameter.isOptional)
+                    null
+                else
+                    throw IllegalArgumentException("Parameter \"${parameter.name}\" is either of unsupported type or null when it was not optional.")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalContracts::class)
@@ -219,10 +227,10 @@ suspend fun Kord.listen(
 
 context(ButtonBuilder.InteractionButtonBuilder, CommandContext) @Suppress("unused")
 suspend fun register(callbackId: String) {
-    componentRegistry.save(customId, callbackId)
+    registry.save(customId, callbackId)
 }
 
 context(SelectMenuBuilder, CommandContext) @Suppress("unused")
 suspend fun register(callbackId: String) {
-    componentRegistry.save(customId, callbackId)
+    registry.save(customId, callbackId)
 }
