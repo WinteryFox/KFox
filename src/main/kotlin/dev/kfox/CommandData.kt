@@ -14,6 +14,7 @@ internal data class CommandNode(
     val description: String,
     val function: KFunction<*>,
     val parameters: Map<String, ParameterData> = emptyMap(),
+    val group: String? = null,
     val parent: String? = null,
-    val children: List<CommandNode> = emptyList()
+    val children: MutableList<CommandNode> = mutableListOf(),
 )

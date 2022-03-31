@@ -8,7 +8,8 @@ annotation class Command(
 
 @Target(AnnotationTarget.FUNCTION)
 annotation class SubCommand(
-    val parent: String
+    val parent: String,
+    val group: String = ""
 )
 
 @Target(AnnotationTarget.FUNCTION)

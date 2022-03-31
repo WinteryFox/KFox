@@ -5,6 +5,7 @@ import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.ComponentType
 import dev.kord.core.Kord
 import dev.kord.core.entity.application.ApplicationCommand
+import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.StringOptionValue
 import dev.kord.core.event.interaction.*
@@ -37,21 +38,28 @@ suspend fun Kord.listen(
         ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
     )
 
-    val localCommands =
-        reflections.getMethodsAnnotatedWith(Command::class.java).map { it.kotlinFunction!! }.map { function ->
-            val annotation = function.findAnnotation<Command>()!!
-            val parent = function.findAnnotation<SubCommand>()?.parent
+    val localCommands: MutableList<CommandNode> = mutableListOf()
+        reflections.getMethodsAnnotatedWith(Command::class.java)
+            .map { it.kotlinFunction!! }
+            .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
+            .map { function ->
+                val annotation = function.findAnnotation<Command>()!!
+                val subCommand = function.findAnnotation<SubCommand>()
 
-            CommandNode(annotation.name,
-                annotation.description,
-                function,
-                function.parameters.map {
-                    val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.description, it)
-                }.associateBy { it.parameter.name!! },
-                parent
-            )
-        }
+                val node = CommandNode(
+                    annotation.name,
+                    annotation.description,
+                    function,
+                    function.parameters.map {
+                        val p = it.findAnnotation<Parameter>()
+                        ParameterData(p?.name, p?.description, it)
+                    }.associateBy { it.parameter.name!! },
+                    subCommand?.group,
+                    subCommand?.parent
+                )
+
+                localCommands.add(node)
+            }
 
     val localComponentCallbacks =
         reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }.associate { function ->
@@ -74,7 +82,7 @@ suspend fun Kord.listen(
             }
 
     val commands = applicationCommands.filter { command ->
-        val localCommand = localCommands.find { it.name == command.name }
+        val localCommand = localCommands.find { it.name == command.name || it.parent == command.name }
 
         if (localCommand == null) {
             logger.warn { "Command \"${command.name}\" is not locally defined, skipping." }
@@ -84,10 +92,10 @@ suspend fun Kord.listen(
         }
     }.toList().associate { command ->
         // TODO: Create missing commands with PUT (or however we end up doing it)
-        val localCommand = localCommands.find { it.name == command.name }!! // TODO: Create missing commands?
+        val localCommand = localCommands.filter { it.name == command.name || it.parent == command.name } // TODO: Create missing commands?
 
         command.id to localCommand
-    }
+    }.filterValues { it.isNotEmpty() }
 
     return on<InteractionCreateEvent> {
         when (this) {
@@ -115,8 +123,22 @@ suspend fun Kord.listen(
             }
 
             is ChatInputCommandInteractionCreateEvent -> {
-                val localCommand = commands[interaction.command.rootId]
+                val matchedCommands = commands[interaction.command.rootId]
                     ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
+
+                val localCommand = when (val command = interaction.command) {
+                    is dev.kord.core.entity.interaction.SubCommand -> {
+                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == null }
+                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
+                    }
+                    is GroupCommand -> {
+                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == command.groupName }
+                            ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
+                    }
+                    else -> {
+                        matchedCommands.first()
+                    }
+                }
 
                 val suppliedParameters = interaction.command.options.mapValues {
                     when (it.value) {

@@ -35,6 +35,18 @@ suspend fun testMenu(
     }
 }
 
+@Command("sub", "Test")
+@SubCommand("test")
+suspend fun testSub(
+    context: PublicChatCommandContext,
+    @Parameter("value", "content-key")
+    value: String
+) {
+    context.response.createPublicFollowup {
+        content = "Sub-commands do still work"
+    }
+}
+
 @Command("parrot", "parrot-key")
 suspend fun testCommand(
     context: PublicChatCommandContext,
@@ -56,6 +68,16 @@ suspend fun testCommand(
                 }
             }
         }
+    }
+}
+
+@Command("parakeet", "Something")
+@SubCommand("birds", "parakeet")
+suspend fun subCommandWithCategory(
+    context: PublicChatCommandContext
+) {
+    context.response.createPublicFollowup {
+        content = "It's Friday my dudes"
     }
 }
 
