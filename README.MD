@@ -79,7 +79,7 @@ suspend fun testCommand(
 
 ```kotlin
 @Command("parakeet", "A happy lil description.") // 1
-@SubCommand("parrot", "secret") // 2 & 3
+@SubCommand("birds", "secret") // 2 & 3
 suspend fun subCommandWithCategory(
     context: PublicChatCommandContext
 ) = with(context) {
@@ -128,7 +128,6 @@ suspend fun testCommand(
         }
     }
 }
-}
 ```
 
 1. Define a new function and annotate it with `@Button`, make sure the ID you specify is unique as this will be
@@ -170,6 +169,7 @@ suspend fun testCommand(
     }
 }
 ```
+
 1. Define a new function and annotate it with `@Button`, make sure the ID you specify is unique as this will be
    used internally to find and call this callback.
 2. You **must** call register within components, this will inform KFox that this is a component we need to track
