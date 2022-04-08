@@ -1,6 +1,6 @@
-package dev.kfox
+package dev.bitflow.kfox
 
-import dev.kfox.contexts.*
+import dev.bitflow.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.core.Kord
 import dev.kord.core.entity.application.ApplicationCommand

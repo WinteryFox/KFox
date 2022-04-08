@@ -1,4 +1,4 @@
-package dev.kfox
+package dev.bitflow.kfox
 
 @Target(AnnotationTarget.FUNCTION)
 annotation class Command(

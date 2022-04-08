@@ -1,6 +1,6 @@
-package dev.kfox.contexts
+package dev.bitflow.kfox.contexts
 
-import dev.kfox.ComponentRegistry
+import dev.bitflow.kfox.ComponentRegistry
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior

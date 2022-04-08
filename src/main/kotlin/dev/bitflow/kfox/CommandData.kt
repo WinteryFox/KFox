@@ -1,4 +1,4 @@
-package dev.kfox
+package dev.bitflow.kfox
 
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
