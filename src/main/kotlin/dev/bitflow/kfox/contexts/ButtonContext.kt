@@ -1,30 +1,30 @@
-package dev.kfox.contexts
+package dev.bitflow.kfox.contexts
 
-import dev.kfox.ComponentRegistry
+import dev.bitflow.kfox.ComponentRegistry
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
-import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
+import dev.kord.core.event.interaction.ButtonInteractionCreateEvent
 
-open class ChatCommandContext(
+open class ButtonContext(
     client: Kord,
     @Suppress("unused")
-    val event: ChatInputCommandInteractionCreateEvent,
+    val event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : CommandContext(client, registry)
+) : ComponentContext(client, registry)
 
-class PublicChatCommandContext(
+class PublicButtonContext(
     client: Kord,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
-    event: ChatInputCommandInteractionCreateEvent,
+    event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(client, event, registry)
+) : ButtonContext(client, event, registry)
 
-class EphemeralChatCommandContext(
+class EphemeralButtonContext(
     client: Kord,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
-    event: ChatInputCommandInteractionCreateEvent,
+    event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(client, event, registry)
+) : ButtonContext(client, event, registry)

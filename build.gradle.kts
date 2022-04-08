@@ -1,12 +1,12 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.6.20-RC2"
+    kotlin("jvm") version "1.6.20"
     kotlin("plugin.serialization") version "1.6.10"
     id("maven-publish")
 }
 
-group = "dev.kfox"
+group = "dev.bitflow"
 version = "1.0-SNAPSHOT"
 
 repositories {
