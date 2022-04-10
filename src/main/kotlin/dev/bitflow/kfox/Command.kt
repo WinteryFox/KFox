@@ -2,7 +2,11 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
+import dev.kord.core.entity.Attachment
+import dev.kord.core.entity.Role
+import dev.kord.core.entity.User
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.OptionValue
@@ -12,7 +16,7 @@ import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
 import dev.kord.rest.builder.component.ButtonBuilder
 import dev.kord.rest.builder.component.SelectMenuBuilder
-import dev.kord.rest.builder.interaction.ModalBuilder
+import dev.kord.rest.builder.interaction.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -58,34 +62,12 @@ suspend fun listen(
     applicationCommands: Flow<ApplicationCommand>,
     scope: CoroutineScope,
     registry: ComponentRegistry = MemoryComponentRegistry(),
+    reflections: Reflections = Reflections(
+        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+    ),
+    localCommands: List<CommandNode> = scanForCommands(reflections)
 ): Job {
     val logger = KotlinLogging.logger {}
-    val reflections = Reflections(
-        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
-    )
-
-    val localCommands: MutableList<CommandNode> = mutableListOf()
-    reflections.getMethodsAnnotatedWith(Command::class.java)
-        .map { it.kotlinFunction!! }
-        .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
-        .map { function ->
-            val annotation = function.findAnnotation<Command>()!!
-            val subCommand = function.findAnnotation<SubCommand>()
-
-            val node = CommandNode(
-                annotation.name,
-                annotation.description,
-                function,
-                function.parameters.map {
-                    val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.description, it)
-                }.associateBy { it.parameter.name!! },
-                subCommand?.group,
-                subCommand?.parent
-            )
-
-            localCommands.add(node)
-        }
 
     val localComponentCallbacks =
         reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }.associate { function ->
@@ -212,8 +194,11 @@ suspend fun Kord.listen(
     `package`: String,
     applicationCommands: Flow<ApplicationCommand>,
     registry: ComponentRegistry = MemoryComponentRegistry(),
+    reflections: Reflections = Reflections(
+        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+    ),
     scope: CoroutineScope = this,
-): Job = listen(events, `package`, applicationCommands, scope, registry)
+): Job = listen(events, `package`, applicationCommands, scope, registry, reflections)
 
 @OptIn(KordUnsafe::class)
 internal suspend fun KFunction<*>.callSuspendByParameters(
@@ -323,34 +308,133 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
 }
 
 @OptIn(ExperimentalContracts::class)
-suspend fun Kord.listen(
+@Suppress("unused")
+suspend fun Kord.putCommandsAndListen(
     `package`: String,
     componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
-    builder: suspend (Kord) -> Flow<ApplicationCommand>
+    reflections: Reflections = Reflections(
+        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+    ),
+    builder: suspend (Kord) -> Flow<ApplicationCommand> = { kord -> putCommands(kord, scanForCommands(reflections)) }
 ): Job {
     contract {
         callsInPlace(builder, InvocationKind.EXACTLY_ONCE)
     }
 
-    return listen(`package`, builder(this), componentRegistry)
+    return listen(`package`, builder(this), componentRegistry, reflections)
 }
 
 @Suppress("unused")
 suspend fun Kord.listen(
-    `package`: String, componentRegistry: ComponentRegistry = MemoryComponentRegistry()
-) = listen(`package`, componentRegistry) { globalCommands }
+    `package`: String,
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
+    reflections: Reflections = Reflections(
+        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+    )
+) = listen(`package`, globalCommands, componentRegistry, reflections)
 
-context(ButtonBuilder.InteractionButtonBuilder, CommandContext) @Suppress("unused")
+context(ButtonBuilder.InteractionButtonBuilder, Context) @Suppress("unused")
 suspend fun register(callbackId: String) {
     registry.save(customId, callbackId)
 }
 
-context(SelectMenuBuilder, CommandContext) @Suppress("unused")
+context(SelectMenuBuilder, Context) @Suppress("unused")
 suspend fun register(callbackId: String) {
     registry.save(customId, callbackId)
 }
 
-context(ModalBuilder, CommandContext) @Suppress("unused")
+context(ModalBuilder, Context) @Suppress("unused")
 suspend fun register(callbackId: String) {
     registry.save(customId, callbackId)
+}
+
+private fun scanForCommands(reflections: Reflections): List<CommandNode> {
+    val localCommands = mutableListOf<CommandNode>()
+    reflections.getMethodsAnnotatedWith(Command::class.java)
+        .map { it.kotlinFunction!! }
+        .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
+        .map { function ->
+            val annotation = function.findAnnotation<Command>()!!
+            val subCommand = function.findAnnotation<SubCommand>()
+
+            val node = CommandNode(
+                annotation.name,
+                annotation.description,
+                function,
+                function.parameters.map {
+                    val p = it.findAnnotation<Parameter>()
+                    ParameterData(p?.name, p?.description, it)
+                }.associateBy { it.parameter.name!! },
+                if (subCommand?.group?.isEmpty() == true) null else subCommand?.group,
+                if (subCommand?.parent?.isEmpty() == true) null else subCommand?.parent
+            )
+
+            localCommands.add(node)
+        }
+    return localCommands
+}
+
+private suspend fun putCommands(
+    kord: Kord,
+    localCommands: List<CommandNode>
+): Flow<ApplicationCommand> = kord.createGuildApplicationCommands(Snowflake(961298079443742740)) {
+    for (command in localCommands) {
+        input(command.name, command.description) {
+            if (command.parent != null) {
+                if (command.group != null)
+                    group(command.group, "temporary") // TODO
+
+                subCommand(command.name, command.description) {
+                    addParameters(command)
+                }
+            } else {
+                addParameters(command)
+            }
+        }
+    }
+}
+
+// TODO: Remove duplicate code
+private fun SubCommandBuilder.addParameters(command: CommandNode) {
+    for (parameter in command.parameters) {
+        val name = parameter.value.name
+        val description = parameter.value.description
+        if (name == null || description == null)
+            continue
+
+        when (parameter.value.parameter) {
+            String::class -> string(name, description)
+            User::class -> user(name, description)
+            Boolean::class -> boolean(name, description)
+            Role::class -> role(name, description)
+            dev.kord.core.entity.channel.Channel::class -> channel(
+                name,
+                description
+            )
+            Attachment::class -> attachment(name, description)
+            else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
+        }
+    }
+}
+
+private fun ChatInputCreateBuilder.addParameters(command: CommandNode) {
+    for (parameter in command.parameters) {
+        val name = parameter.value.name
+        val description = parameter.value.description
+        if (name == null || description == null)
+            continue
+
+        when (parameter.value.parameter) {
+            String::class -> string(name, description)
+            User::class -> user(name, description)
+            Boolean::class -> boolean(name, description)
+            Role::class -> role(name, description)
+            dev.kord.core.entity.channel.Channel::class -> channel(
+                name,
+                description
+            )
+            Attachment::class -> attachment(name, description)
+            else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
+        }
+    }
 }

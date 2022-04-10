@@ -3,12 +3,17 @@ package dev.bitflow.kfox.contexts
 import dev.bitflow.kfox.ComponentRegistry
 import dev.kord.core.Kord
 
-sealed class CommandContext(
+sealed class Context(
     val client: Kord,
     val registry: ComponentRegistry
 )
 
+sealed class CommandContext(
+    client: Kord,
+    registry: ComponentRegistry
+) : Context(client, registry)
+
 sealed class ComponentContext(
-    val client: Kord,
-    val registry: ComponentRegistry
-)
+    client: Kord,
+    registry: ComponentRegistry
+) : Context(client, registry)

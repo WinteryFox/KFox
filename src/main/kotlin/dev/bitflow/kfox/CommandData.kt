@@ -3,13 +3,13 @@ package dev.bitflow.kfox
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 
-internal data class ParameterData(
+data class ParameterData(
     val name: String?,
     val description: String?,
     val parameter: KParameter
 )
 
-internal data class CommandNode(
+data class CommandNode(
     val name: String,
     val description: String,
     val function: KFunction<*>,
