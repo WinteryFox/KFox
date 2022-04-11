@@ -92,10 +92,11 @@ suspend fun listen(
                         val params: MutableMap<String, String> = mutableMapOf()
 
                         for (param in function.parameters) {
-                            val annotation = param.findAnnotation<ModalValue>() // TODO
+                            val name = param.findAnnotation<ModalValue>()?.customId
+                                ?: param.name
                                 ?: continue
 
-                            params[annotation.customId] = param.name!!
+                            params[name] = param.name!!
                         }
 
                         annotation.callbackId to ModalComponentCallback(
