@@ -15,10 +15,14 @@ const val MODAL_CALLBACK = "modal"
 
 @Modal(MODAL_CALLBACK)
 suspend fun modal(
-    context: PublicModalContext
+    context: PublicModalContext,
+    @ModalValue("poem")
+    modalValue: String,
+    @ModalValue("name")
+    what: String
 ) = with(context) {
     response.createPublicFollowup {
-        content = "Your beautiful poem reads; ${event.interaction.textInputs["bbb"]?.value}"
+        content = "Your beautiful poem reads; $modalValue and your name is $what"
     }
 }
 
@@ -65,8 +69,14 @@ suspend fun testCommand(
     with(context) {
         event.interaction.modal("Hello!", "aaa") {
             actionRow {
-                textInput(TextInputStyle.Short, "bbb", "Poetry night") {
+                textInput(TextInputStyle.Short, "poem", "Poetry night") {
                     placeholder = "Let out your inner Shakespeare"
+                }
+            }
+
+            actionRow {
+                textInput(TextInputStyle.Short, "name", "What's your name?") {
+                    placeholder = "✨ Amy"
                 }
             }
 
@@ -96,7 +106,7 @@ class TestBot {
 
     @Test
     fun testBot() = runBlocking {
-        client.listen("dev.kfox") {
+        client.listen("dev.bitflow.kfox") {
             it.getGuildApplicationCommands(Snowflake(809278232100077629))
         }
 

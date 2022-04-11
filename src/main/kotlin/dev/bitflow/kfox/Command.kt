@@ -9,8 +9,6 @@ import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
-import dev.kord.core.entity.interaction.OptionValue
-import dev.kord.core.entity.interaction.StringOptionValue
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
@@ -91,9 +89,19 @@ suspend fun listen(
                     .associate { function ->
                         val annotation = function.findAnnotation<Modal>()!!
 
-                        annotation.callbackId to ComponentCallback(
+                        val params: MutableMap<String, String> = mutableMapOf()
+
+                        for (param in function.parameters) {
+                            val annotation = param.findAnnotation<ModalValue>() // TODO
+                                ?: continue
+
+                            params[annotation.customId] = param.name!!
+                        }
+
+                        annotation.callbackId to ModalComponentCallback(
                             annotation.callbackId,
-                            function
+                            function,
+                            params
                         )
                     }
 
@@ -122,15 +130,20 @@ suspend fun listen(
                     with(event) {
                         when (this) {
                             is ModalSubmitInteractionCreateEvent -> {
-                                val callback =
-                                    getCallback(logger, localComponentCallbacks, registry, interaction.modalId)
-                                        ?: return@runCatching
+                                val callback = (
+                                        getCallback(logger, localComponentCallbacks, registry, interaction.modalId)
+                                                as? ModalComponentCallback
+                                        ) ?: return@runCatching
 
                                 callback.function.callSuspendByParameters(
                                     kord,
                                     registry,
                                     this,
-                                    emptyMap()
+                                    interaction.textInputs
+                                        .filterKeys { it in callback.params }
+                                        .map {
+                                            callback.params[it.key]!! to it.value.value
+                                        }.toMap()
                                 )
                             }
                             is ComponentInteractionCreateEvent -> {
@@ -163,15 +176,7 @@ suspend fun listen(
                                     }
                                 }
 
-                                val suppliedParameters = interaction.command.options.mapValues {
-                                    when (it.value) {
-                                        is StringOptionValue -> StringOptionValue(
-                                            (it.value.value as String).trim(),
-                                            it.value.focused
-                                        )
-                                        else -> it.value
-                                    }
-                                }
+                                val suppliedParameters = interaction.command.options.mapValues { it.value.value }
 
                                 localCommand.function.callSuspendByParameters(
                                     kord,
@@ -205,7 +210,7 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
     kord: Kord,
     registry: ComponentRegistry,
     event: InteractionCreateEvent,
-    suppliedParameters: Map<String, OptionValue<Any?>>,
+    suppliedParameters: Map<String, Any?>,
     commandParameters: Map<String, ParameterData> = emptyMap(),
 ) {
     callSuspendBy(
@@ -215,7 +220,7 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
             }?.value
 
             if (supplied != null)
-                return@associateWith supplied.value
+                return@associateWith supplied
 
             when (parameter.type.classifier) {
                 ChatCommandContext::class ->
@@ -309,7 +314,7 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
 
 @OptIn(ExperimentalContracts::class)
 @Suppress("unused")
-suspend fun Kord.putCommandsAndListen(
+suspend fun Kord.listen(
     `package`: String,
     componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
     reflections: Reflections = Reflections(

@@ -32,3 +32,8 @@ annotation class SelectMenu(
 annotation class Modal(
     val callbackId: String
 )
+
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class ModalValue(
+    val customId: String
+)
