@@ -30,7 +30,11 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
+import kotlin.reflect.full.createType
 import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.isSubtypeOf
+import kotlin.reflect.javaType
+import kotlin.reflect.jvm.jvmErasure
 import kotlin.reflect.jvm.kotlinFunction
 
 internal suspend inline fun getCallback(
@@ -330,15 +334,6 @@ suspend fun Kord.listen(
     return listen(`package`, builder(this), componentRegistry, reflections)
 }
 
-@Suppress("unused")
-suspend fun Kord.listen(
-    `package`: String,
-    componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
-    reflections: Reflections = Reflections(
-        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
-    )
-) = listen(`package`, globalCommands, componentRegistry, reflections)
-
 context(ButtonBuilder.InteractionButtonBuilder, Context) @Suppress("unused")
 suspend fun register(callbackId: String) {
     registry.save(customId, callbackId)
@@ -385,8 +380,9 @@ private suspend fun putCommands(
     localCommands: List<CommandNode>
 ): Flow<ApplicationCommand> = kord.createGuildApplicationCommands(Snowflake(961298079443742740)) {
     for (command in localCommands) {
-        input(command.name, command.description) {
+        input("", command.description) {
             if (command.parent != null) {
+                name = command.parent
                 if (command.group != null)
                     group(command.group, "temporary") // TODO
 
@@ -394,6 +390,7 @@ private suspend fun putCommands(
                     addParameters(command)
                 }
             } else {
+                name = command.name
                 addParameters(command)
             }
         }
@@ -408,7 +405,7 @@ private fun SubCommandBuilder.addParameters(command: CommandNode) {
         if (name == null || description == null)
             continue
 
-        when (parameter.value.parameter) {
+        when (parameter.value.parameter.type.classifier) {
             String::class -> string(name, description)
             User::class -> user(name, description)
             Boolean::class -> boolean(name, description)
@@ -430,7 +427,7 @@ private fun ChatInputCreateBuilder.addParameters(command: CommandNode) {
         if (name == null || description == null)
             continue
 
-        when (parameter.value.parameter) {
+        when (parameter.value.parameter.type.classifier) {
             String::class -> string(name, description)
             User::class -> user(name, description)
             Boolean::class -> boolean(name, description)
