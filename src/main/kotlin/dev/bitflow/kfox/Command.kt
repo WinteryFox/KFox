@@ -30,11 +30,7 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
-import kotlin.reflect.full.createType
 import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.javaType
-import kotlin.reflect.jvm.jvmErasure
 import kotlin.reflect.jvm.kotlinFunction
 
 internal suspend inline fun getCallback(
@@ -334,20 +330,20 @@ suspend fun Kord.listen(
     return listen(`package`, builder(this), componentRegistry, reflections)
 }
 
-context(ButtonBuilder.InteractionButtonBuilder, Context) @Suppress("unused")
-suspend fun register(callbackId: String) {
-    registry.save(customId, callbackId)
-}
-
-context(SelectMenuBuilder, Context) @Suppress("unused")
-suspend fun register(callbackId: String) {
-    registry.save(customId, callbackId)
-}
-
-context(ModalBuilder, Context) @Suppress("unused")
-suspend fun register(callbackId: String) {
-    registry.save(customId, callbackId)
-}
+//context(ButtonBuilder.InteractionButtonBuilder, Context) @Suppress("unused")
+//suspend fun register(callbackId: String) {
+//    registry.save(customId, callbackId)
+//}
+//
+//context(SelectMenuBuilder, Context) @Suppress("unused")
+//suspend fun register(callbackId: String) {
+//    registry.save(customId, callbackId)
+//}
+//
+//context(ModalBuilder, Context) @Suppress("unused")
+//suspend fun register(callbackId: String) {
+//    registry.save(customId, callbackId)
+//}
 
 private fun scanForCommands(reflections: Reflections): List<CommandNode> {
     val localCommands = mutableListOf<CommandNode>()
@@ -378,49 +374,30 @@ private fun scanForCommands(reflections: Reflections): List<CommandNode> {
 private suspend fun putCommands(
     kord: Kord,
     localCommands: List<CommandNode>
+// 809278232100077629
 ): Flow<ApplicationCommand> = kord.createGuildApplicationCommands(Snowflake(961298079443742740)) {
-    for (command in localCommands) {
-        input("", command.description) {
-            if (command.parent != null) {
-                name = command.parent
-                if (command.group != null)
-                    group(command.group, "temporary") // TODO
-
-                subCommand(command.name, command.description) {
-                    addParameters(command)
-                }
-            } else {
-                name = command.name
-                addParameters(command)
+    for (command in localCommands.filter { it.parent == null }) {
+        val children = localCommands.filter { it.parent == command.name }
+        input(command.name, command.description) {
+            for (child in children) {
+                if (child.group != null)
+                    group(child.group, "temporary") { // TODO: Set description for groups}
+                        subCommand(child.name, child.description) {
+                            addParameters(child)
+                        }
+                    }
+                else
+                    subCommand(child.name, child.description) {
+                        addParameters(child)
+                    }
             }
+
+            addParameters(command)
         }
     }
 }
 
-// TODO: Remove duplicate code
-private fun SubCommandBuilder.addParameters(command: CommandNode) {
-    for (parameter in command.parameters) {
-        val name = parameter.value.name
-        val description = parameter.value.description
-        if (name == null || description == null)
-            continue
-
-        when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description)
-            User::class -> user(name, description)
-            Boolean::class -> boolean(name, description)
-            Role::class -> role(name, description)
-            dev.kord.core.entity.channel.Channel::class -> channel(
-                name,
-                description
-            )
-            Attachment::class -> attachment(name, description)
-            else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
-        }
-    }
-}
-
-private fun ChatInputCreateBuilder.addParameters(command: CommandNode) {
+private fun BaseInputChatBuilder.addParameters(command: CommandNode) {
     for (parameter in command.parameters) {
         val name = parameter.value.name
         val description = parameter.value.description

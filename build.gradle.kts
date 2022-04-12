@@ -44,7 +44,7 @@ tasks.test {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs = freeCompilerArgs + listOf("-opt-in=kotlin.RequiresOptIn", "-Xcontext-receivers")
+        freeCompilerArgs = freeCompilerArgs + listOf("-opt-in=kotlin.RequiresOptIn")
     }
 }
 
