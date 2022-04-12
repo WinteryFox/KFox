@@ -86,7 +86,8 @@ suspend fun testCommand(
 }
 
 @Command("parakeet", "Something")
-@SubCommand("birds", "parakeet")
+@SubCommand("birds")
+@Group("parakeet", "This group contains birbs")
 suspend fun subCommandWithCategory(
     context: PublicChatCommandContext
 ) {

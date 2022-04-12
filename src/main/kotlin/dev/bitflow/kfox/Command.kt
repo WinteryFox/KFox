@@ -12,8 +12,6 @@ import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
-import dev.kord.rest.builder.component.ButtonBuilder
-import dev.kord.rest.builder.component.SelectMenuBuilder
 import dev.kord.rest.builder.interaction.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -63,7 +61,7 @@ suspend fun listen(
     reflections: Reflections = Reflections(
         ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
     ),
-    localCommands: List<CommandNode> = scanForCommands(reflections)
+    localCommands: List<CommandData> = scanForCommands(reflections)
 ): Job {
     val logger = KotlinLogging.logger {}
 
@@ -169,7 +167,7 @@ suspend fun listen(
                                             ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
                                     }
                                     is GroupCommand -> {
-                                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == command.groupName }
+                                        matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group?.name == command.groupName }
                                             ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
                                     }
                                     else -> {
@@ -345,16 +343,17 @@ suspend fun Kord.listen(
 //    registry.save(customId, callbackId)
 //}
 
-private fun scanForCommands(reflections: Reflections): List<CommandNode> {
-    val localCommands = mutableListOf<CommandNode>()
+private fun scanForCommands(reflections: Reflections): List<CommandData> {
+    val localCommands = mutableListOf<CommandData>()
     reflections.getMethodsAnnotatedWith(Command::class.java)
         .map { it.kotlinFunction!! }
         .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
         .map { function ->
             val annotation = function.findAnnotation<Command>()!!
             val subCommand = function.findAnnotation<SubCommand>()
+            val group = function.findAnnotation<Group>()
 
-            val node = CommandNode(
+            val node = CommandData(
                 annotation.name,
                 annotation.description,
                 function,
@@ -362,7 +361,7 @@ private fun scanForCommands(reflections: Reflections): List<CommandNode> {
                     val p = it.findAnnotation<Parameter>()
                     ParameterData(p?.name, p?.description, it)
                 }.associateBy { it.parameter.name!! },
-                if (subCommand?.group?.isEmpty() == true) null else subCommand?.group,
+                if (group == null) null else GroupData(group.name, group.description),
                 if (subCommand?.parent?.isEmpty() == true) null else subCommand?.parent
             )
 
@@ -373,7 +372,7 @@ private fun scanForCommands(reflections: Reflections): List<CommandNode> {
 
 private suspend fun putCommands(
     kord: Kord,
-    localCommands: List<CommandNode>
+    localCommands: List<CommandData>
 // 809278232100077629
 ): Flow<ApplicationCommand> = kord.createGuildApplicationCommands(Snowflake(961298079443742740)) {
     for (command in localCommands.filter { it.parent == null }) {
@@ -381,7 +380,7 @@ private suspend fun putCommands(
         input(command.name, command.description) {
             for (child in children) {
                 if (child.group != null)
-                    group(child.group, "temporary") { // TODO: Set description for groups}
+                    group(child.group.name, child.group.description) {
                         subCommand(child.name, child.description) {
                             addParameters(child)
                         }
@@ -397,7 +396,7 @@ private suspend fun putCommands(
     }
 }
 
-private fun BaseInputChatBuilder.addParameters(command: CommandNode) {
+private fun BaseInputChatBuilder.addParameters(command: CommandData) {
     for (parameter in command.parameters) {
         val name = parameter.value.name
         val description = parameter.value.description

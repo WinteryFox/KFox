@@ -8,8 +8,12 @@ annotation class Command(
 
 @Target(AnnotationTarget.FUNCTION)
 annotation class SubCommand(
-    val parent: String,
-    val group: String = ""
+    val parent: String
+)
+
+annotation class Group(
+    val name: String,
+    val description: String
 )
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
