@@ -2,7 +2,6 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
-import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
@@ -23,9 +22,6 @@ import mu.KotlinLogging
 import org.reflections.Reflections
 import org.reflections.scanners.Scanners
 import org.reflections.util.ConfigurationBuilder
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
@@ -52,15 +48,17 @@ internal suspend inline fun getCallback(
     return callback
 }
 
+fun reflections(`package`: String) = Reflections(
+    ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
+)
+
 suspend fun listen(
     events: Flow<Event>,
     `package`: String,
     applicationCommands: Flow<ApplicationCommand>,
     scope: CoroutineScope,
     registry: ComponentRegistry = MemoryComponentRegistry(),
-    reflections: Reflections = Reflections(
-        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
-    ),
+    reflections: Reflections = reflections(`package`),
     localCommands: List<CommandData> = scanForCommands(reflections)
 ): Job {
     val logger = KotlinLogging.logger {}
@@ -196,13 +194,16 @@ suspend fun listen(
 
 suspend fun Kord.listen(
     `package`: String,
-    applicationCommands: Flow<ApplicationCommand>,
     registry: ComponentRegistry = MemoryComponentRegistry(),
-    reflections: Reflections = Reflections(
-        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
-    ),
+    reflections: Reflections = reflections(`package`),
+    localCommands: List<CommandData> = scanForCommands(reflections),
     scope: CoroutineScope = this,
-): Job = listen(events, `package`, applicationCommands, scope, registry, reflections)
+    applicationCommands: suspend Kord.() -> Flow<ApplicationCommand> = {
+        createGlobalApplicationCommands {
+            registerCommands(localCommands)
+        }
+    }
+): Job = listen(events, `package`, applicationCommands(), scope, registry, reflections, localCommands)
 
 @OptIn(KordUnsafe::class)
 internal suspend fun KFunction<*>.callSuspendByParameters(
@@ -311,23 +312,6 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
     )
 }
 
-@OptIn(ExperimentalContracts::class)
-@Suppress("unused")
-suspend fun Kord.listen(
-    `package`: String,
-    componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
-    reflections: Reflections = Reflections(
-        ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)
-    ),
-    builder: suspend (Kord) -> Flow<ApplicationCommand> = { kord -> putCommands(kord, scanForCommands(reflections)) }
-): Job {
-    contract {
-        callsInPlace(builder, InvocationKind.EXACTLY_ONCE)
-    }
-
-    return listen(`package`, builder(this), componentRegistry, reflections)
-}
-
 //context(ButtonBuilder.InteractionButtonBuilder, Context) @Suppress("unused")
 //suspend fun register(callbackId: String) {
 //    registry.save(customId, callbackId)
@@ -343,7 +327,7 @@ suspend fun Kord.listen(
 //    registry.save(customId, callbackId)
 //}
 
-private fun scanForCommands(reflections: Reflections): List<CommandData> {
+fun scanForCommands(reflections: Reflections): List<CommandData> {
     val localCommands = mutableListOf<CommandData>()
     reflections.getMethodsAnnotatedWith(Command::class.java)
         .map { it.kotlinFunction!! }
@@ -370,11 +354,7 @@ private fun scanForCommands(reflections: Reflections): List<CommandData> {
     return localCommands
 }
 
-private suspend fun putCommands(
-    kord: Kord,
-    localCommands: List<CommandData>
-// 809278232100077629
-): Flow<ApplicationCommand> = kord.createGuildApplicationCommands(Snowflake(961298079443742740)) {
+fun MultiApplicationCommandBuilder.registerCommands(localCommands: List<CommandData>) {
     for (command in localCommands.filter { it.parent == null }) {
         val children = localCommands.filter { it.parent == command.name }
         input(command.name, command.description) {

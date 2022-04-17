@@ -107,7 +107,11 @@ class TestBot {
 
     @Test
     fun testBot() = runBlocking {
-        client.listen("dev.bitflow.kfox")
+        client.listen("dev.bitflow.kfox") {
+            createGuildApplicationCommands(Snowflake(809278232100077629)) {
+                registerCommands(scanForCommands(reflections("dev.bitflow.kfox")))
+            }
+        }
 
         client.login()
     }
