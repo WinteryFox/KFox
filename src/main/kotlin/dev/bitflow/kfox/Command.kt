@@ -8,6 +8,7 @@ import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
+import dev.kord.core.entity.interaction.ResolvableOptionValue
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
@@ -173,7 +174,7 @@ suspend fun listen(
                                     }
                                 }
 
-                                val suppliedParameters = interaction.command.options.mapValues { it.value.value }
+                                val suppliedParameters = interaction.command.options.mapValues { it.value }
 
                                 localCommand.function.callSuspendByParameters(
                                     kord,
@@ -213,102 +214,108 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
     suppliedParameters: Map<String, Any?>,
     commandParameters: Map<String, ParameterData> = emptyMap(),
 ) {
-    callSuspendBy(
-        parameters.associateWith { parameter ->
-            val supplied = suppliedParameters.entries.find {
+    val parameters = parameters.associateWith { parameter ->
+        val supplied = suppliedParameters
+            .entries
+            .find {
                 it.key == (commandParameters[parameter.name]?.name ?: parameter.name)
-            }?.value
-
-            if (supplied != null)
-                return@associateWith supplied
-
-            when (parameter.type.classifier) {
-                ChatCommandContext::class ->
-                    ChatCommandContext(
-                        kord,
-                        event as ChatInputCommandInteractionCreateEvent,
-                        registry
-                    )
-                PublicChatCommandContext::class ->
-                    PublicChatCommandContext(
-                        kord,
-                        (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                EphemeralChatCommandContext::class ->
-                    EphemeralChatCommandContext(
-                        kord,
-                        (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                ButtonContext::class ->
-                    ButtonContext(
-                        kord,
-                        event as ButtonInteractionCreateEvent,
-                        registry
-                    )
-                PublicButtonContext::class ->
-                    PublicButtonContext(
-                        kord,
-                        (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                EphemeralButtonContext::class ->
-                    EphemeralButtonContext(
-                        kord,
-                        (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                SelectMenuContext::class ->
-                    SelectMenuContext(
-                        kord,
-                        event as SelectMenuInteractionCreateEvent,
-                        registry
-                    )
-                PublicSelectMenuContext::class ->
-                    PublicSelectMenuContext(
-                        kord,
-                        (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                EphemeralSelectMenuContext::class ->
-                    EphemeralSelectMenuContext(
-                        kord,
-                        (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                ModalContext::class ->
-                    ModalContext(
-                        kord,
-                        event as ModalSubmitInteractionCreateEvent,
-                        registry
-                    )
-                PublicModalContext::class ->
-                    PublicModalContext(
-                        kord,
-                        (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                EphemeralModalContext::class ->
-                    EphemeralModalContext(
-                        kord,
-                        (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
-                        event,
-                        registry
-                    )
-                else -> if (parameter.isOptional)
-                    null
-                else
-                    throw IllegalArgumentException("Parameter \"${parameter.name}\" is either of unsupported type or null when it was not optional.")
             }
+
+        if (supplied != null)
+            return@associateWith if (supplied.value is ResolvableOptionValue<*>)
+                (supplied.value as ResolvableOptionValue<*>).resolvedObject
+            else
+                supplied.value
+
+        when (parameter.type.classifier) {
+            ChatCommandContext::class ->
+                ChatCommandContext(
+                    kord,
+                    event as ChatInputCommandInteractionCreateEvent,
+                    registry
+                )
+            PublicChatCommandContext::class ->
+                PublicChatCommandContext(
+                    kord,
+                    (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                    event,
+                    registry
+                )
+            EphemeralChatCommandContext::class ->
+                EphemeralChatCommandContext(
+                    kord,
+                    (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                    event,
+                    registry
+                )
+            ButtonContext::class ->
+                ButtonContext(
+                    kord,
+                    event as ButtonInteractionCreateEvent,
+                    registry
+                )
+            PublicButtonContext::class ->
+                PublicButtonContext(
+                    kord,
+                    (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                    event,
+                    registry
+                )
+            EphemeralButtonContext::class ->
+                EphemeralButtonContext(
+                    kord,
+                    (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                    event,
+                    registry
+                )
+            SelectMenuContext::class ->
+                SelectMenuContext(
+                    kord,
+                    event as SelectMenuInteractionCreateEvent,
+                    registry
+                )
+            PublicSelectMenuContext::class ->
+                PublicSelectMenuContext(
+                    kord,
+                    (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                    event,
+                    registry
+                )
+            EphemeralSelectMenuContext::class ->
+                EphemeralSelectMenuContext(
+                    kord,
+                    (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                    event,
+                    registry
+                )
+            ModalContext::class ->
+                ModalContext(
+                    kord,
+                    event as ModalSubmitInteractionCreateEvent,
+                    registry
+                )
+            PublicModalContext::class ->
+                PublicModalContext(
+                    kord,
+                    (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
+                    event,
+                    registry
+                )
+            EphemeralModalContext::class ->
+                EphemeralModalContext(
+                    kord,
+                    (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
+                    event,
+                    registry
+                )
+            else -> if (parameter.isOptional)
+                null
+            else
+                throw IllegalArgumentException("Parameter \"${parameter.name}\" is either of unsupported type or null when it was not optional.")
         }
+    }
+    callSuspendBy(
+        parameters
     )
 }
 
@@ -383,16 +390,17 @@ private fun BaseInputChatBuilder.addParameters(command: CommandData) {
         if (name == null || description == null)
             continue
 
+        val nullable = parameter.value.parameter.type.isMarkedNullable
         when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description)
-            User::class -> user(name, description)
-            Boolean::class -> boolean(name, description)
-            Role::class -> role(name, description)
+            String::class -> string(name, description) { required = !nullable }
+            User::class -> user(name, description) { required = !nullable }
+            Boolean::class -> boolean(name, description) { required = !nullable }
+            Role::class -> role(name, description) { required = !nullable }
             dev.kord.core.entity.channel.Channel::class -> channel(
                 name,
                 description
-            )
-            Attachment::class -> attachment(name, description)
+            ) { required = !nullable }
+            Attachment::class -> attachment(name, description) { required = !nullable }
             else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
         }
     }
