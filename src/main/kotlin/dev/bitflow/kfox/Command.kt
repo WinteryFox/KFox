@@ -8,9 +8,7 @@ import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
-import dev.kord.core.entity.interaction.MemberOptionValue
 import dev.kord.core.entity.interaction.ResolvableOptionValue
-import dev.kord.core.entity.interaction.UserOptionValue
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
@@ -224,14 +222,10 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
             }
 
         if (supplied != null)
-            return@associateWith when (supplied.value) {
-                is ResolvableOptionValue<*> -> {
-                    (supplied.value as ResolvableOptionValue<*>).resolvedObject
-                }
-                else -> {
-                    supplied.value
-                }
-            }
+            return@associateWith if (supplied.value is ResolvableOptionValue<*>)
+                (supplied.value as ResolvableOptionValue<*>).resolvedObject
+            else
+                supplied.value
 
         when (parameter.type.classifier) {
             ChatCommandContext::class ->
