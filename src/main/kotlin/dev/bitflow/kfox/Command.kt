@@ -390,16 +390,17 @@ private fun BaseInputChatBuilder.addParameters(command: CommandData) {
         if (name == null || description == null)
             continue
 
+        val nullable = parameter.value.parameter.type.isMarkedNullable
         when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description)
-            User::class -> user(name, description)
-            Boolean::class -> boolean(name, description)
-            Role::class -> role(name, description)
+            String::class -> string(name, description) { required = !nullable }
+            User::class -> user(name, description) { required = !nullable }
+            Boolean::class -> boolean(name, description) { required = !nullable }
+            Role::class -> role(name, description) { required = !nullable }
             dev.kord.core.entity.channel.Channel::class -> channel(
                 name,
                 description
-            )
-            Attachment::class -> attachment(name, description)
+            ) { required = !nullable }
+            Attachment::class -> attachment(name, description) { required = !nullable }
             else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
         }
     }
