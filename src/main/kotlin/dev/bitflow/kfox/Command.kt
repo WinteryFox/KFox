@@ -8,6 +8,7 @@ import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
 import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
+import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.ResolvableOptionValue
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
@@ -221,11 +222,19 @@ internal suspend fun KFunction<*>.callSuspendByParameters(
                 it.key == (commandParameters[parameter.name]?.name ?: parameter.name)
             }
 
-        if (supplied != null)
-            return@associateWith if (supplied.value is ResolvableOptionValue<*>)
-                (supplied.value as ResolvableOptionValue<*>).resolvedObject
-            else
-                supplied.value
+        if (supplied != null) {
+            val value = supplied.value
+            if (value == null && !parameter.type.isMarkedNullable)
+                throw IllegalStateException("Non-nullable parameter \"${supplied.key}\" is null, did you accidentally set not required when creating the command?")
+            if (value !is OptionValue<*> || parameter.type.classifier == OptionValue::class.java)
+                return@associateWith value
+
+            return@associateWith if (value is ResolvableOptionValue<*>) {
+                value.resolvedObject
+            } else {
+                value.value
+            }
+        }
 
         when (parameter.type.classifier) {
             ChatCommandContext::class ->
