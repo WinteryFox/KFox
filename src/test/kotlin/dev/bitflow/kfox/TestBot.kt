@@ -48,15 +48,18 @@ suspend fun testMenu(
     }
 }
 
+@Command("test", "test")
+fun test() {}
+
 @Command("sub", "Test")
 @SubCommand("test")
 suspend fun testSub(
     context: PublicChatCommandContext,
     @Parameter("value", "content-key")
-    value: String
+    value: String?
 ) {
     context.response.createPublicFollowup {
-        content = "Sub-commands do still work"
+        content = "Your value was $value"
     }
 }
 
