@@ -2,6 +2,9 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.ApplicationCommandOptionType
+import dev.kord.common.entity.Choice
+import dev.kord.common.entity.optional.Optional
 import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
@@ -358,7 +361,13 @@ fun scanForCommands(reflections: Reflections): List<CommandData> {
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.description, it)
+                    val choices = it.findAnnotation<Choices>()
+                    ParameterData(
+                        p?.name,
+                        p?.description,
+                        it,
+                        choices?.list?.map { choice -> Choice.StringChoice(choice, Optional(null), choice)}?.toMutableList()
+                    )
                 }.associateBy { it.parameter.name!! },
                 if (group == null) null else GroupData(group.name, group.description),
                 if (subCommand?.parent?.isEmpty() == true) null else subCommand?.parent
@@ -400,14 +409,17 @@ private fun BaseInputChatBuilder.addParameters(command: CommandData) {
 
         val nullable = parameter.value.parameter.type.isMarkedNullable
         when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description) { required = !nullable }
+            Number::class -> number(name, description) { required = !nullable }
+            Int::class -> int(name, description) { required = !nullable }
+            String::class -> string(name, description) {
+                required = !nullable
+                choices = parameter.value.choices
+            }
             User::class -> user(name, description) { required = !nullable }
             Boolean::class -> boolean(name, description) { required = !nullable }
             Role::class -> role(name, description) { required = !nullable }
-            dev.kord.core.entity.channel.Channel::class -> channel(
-                name,
-                description
-            ) { required = !nullable }
+            ApplicationCommandOptionType.Mentionable::class -> mentionable(name, description) { required = !nullable }
+            dev.kord.core.entity.channel.Channel::class -> channel(name, description) { required = !nullable }
             Attachment::class -> attachment(name, description) { required = !nullable }
             else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
         }

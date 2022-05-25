@@ -22,6 +22,11 @@ annotation class Parameter(
     val description: String
 )
 
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class Choices(
+    val list: Array<String>
+)
+
 @Target(AnnotationTarget.FUNCTION)
 annotation class Button(
     val callbackId: String
