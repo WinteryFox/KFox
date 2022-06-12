@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-val kordVersion = "revamp-kord-builder-SNAPSHOT"
+val kordVersion = "0.8.0-M14"
 
 plugins {
     kotlin("jvm") version "1.6.20"
@@ -22,11 +22,11 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.6.10")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
 
-    implementation("io.github.microutils:kotlin-logging-jvm:2.1.21")
+    implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
     runtimeOnly("org.slf4j:slf4j-api:1.7.36")
     runtimeOnly("ch.qos.logback:logback-classic:1.2.11")
     runtimeOnly("ch.qos.logback:logback-core:1.2.11")

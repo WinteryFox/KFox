@@ -2,7 +2,6 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
 import dev.kord.common.annotation.KordUnsafe
-import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
@@ -31,7 +30,7 @@ import kotlin.reflect.jvm.kotlinFunction
 
 class KFox(
     reflections: Reflections,
-    private val commands: Map<Snowflake, List<CommandData>>,
+    private val commands: Map<String, List<CommandData>>,
     private val registry: ComponentRegistry = MemoryComponentRegistry()
 ) : CoroutineScope {
     override val coroutineContext: CoroutineContext
@@ -81,23 +80,6 @@ class KFox(
                             )
                         }
         logger.debug { "Reflection found ${localComponentCallbacks.size} component callbacks." }
-
-        /*commands = applicationCommands.filter { command ->
-            val localCommand = localCommands.find { it.name == command.name || it.parent == command.name }
-
-            if (localCommand == null) {
-                logger.warn { "Command \"${command.name}\" is not locally defined, skipping." }
-                false
-            } else {
-                true
-            }
-        }.toList().associate { command ->
-            // TODO: Create missing commands with PUT (or however we end up doing it)
-            val localCommand =
-                localCommands.filter { it.name == command.name || it.parent == command.name } // TODO: Create missing commands?
-
-            command.id to localCommand
-        }.filterValues { it.isNotEmpty() }*/
         logger.debug { "Serving ${commands.size} commands." }
         logger.info { "KFox instance is ready!" }
     }
@@ -143,7 +125,7 @@ class KFox(
                                 }
 
                                 is ChatInputCommandInteractionCreateEvent -> {
-                                    val matchedCommands = commands[interaction.command.rootId]
+                                    val matchedCommands = commands[interaction.command.rootName]
                                         ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
 
                                     val localCommand = when (val command = interaction.command) {
@@ -417,12 +399,12 @@ suspend fun Kord.kfox(
     val reflections = Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
     val localCommands = scanForCommands(reflections)
 
-    suspend fun Flow<GlobalApplicationCommand>.associateCommands(): Map<Snowflake, List<CommandData>> = toList()
+    suspend fun Flow<GlobalApplicationCommand>.associateCommands(): Map<String, List<CommandData>> = toList()
         .associate { command ->
             val localCommand =
                 localCommands.filter { it.name == command.name || it.parent == command.name }
 
-            command.id to localCommand
+            command.name to localCommand
         }
         .filterValues { it.isNotEmpty() }
 
