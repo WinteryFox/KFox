@@ -18,6 +18,8 @@ It will allow you to easily create and respond to any type of interaction that K
 ## Supported interactions
 
 - [x] Commands
+    - [x] Global
+    - [x] Guild
     - [x] Parameters
     - [x] Sub-commands
     - [x] Groups

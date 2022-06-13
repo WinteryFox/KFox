@@ -1,7 +1,6 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
-import dev.kord.common.entity.Snowflake
 import dev.kord.common.entity.TextInputStyle
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.modal
@@ -48,10 +47,10 @@ suspend fun testMenu(
     }
 }
 
-@Command("test", "test")
+@Command("test", "test", 809278232100077629L)
 fun test() {}
 
-@Command("sub", "Test")
+@Command("sub", "Test", 809278232100077629L)
 @SubCommand("test")
 suspend fun testSub(
     context: PublicChatCommandContext,
@@ -63,7 +62,7 @@ suspend fun testSub(
     }
 }
 
-@Command("parrot", "parrot-key")
+@Command("parrot", "parrot-key", 809278232100077629L)
 suspend fun testCommand(
     context: ChatCommandContext,
     @Parameter("content", "content-key")
@@ -88,7 +87,7 @@ suspend fun testCommand(
     }
 }
 
-@Command("parakeet", "Something")
+@Command("parakeet", "Something", 809278232100077629L)
 @SubCommand("birds")
 @Group("parakeet", "This group contains birbs")
 suspend fun subCommandWithCategory(
@@ -109,13 +108,10 @@ class TestBot {
     }
 
     @Test
-    fun testBot() = runBlocking {
-        client.listen("dev.bitflow.kfox") {
-            createGuildApplicationCommands(Snowflake(809278232100077629)) {
-                registerCommands(scanForCommands(reflections("dev.bitflow.kfox")))
-            }
-        }
-
+    fun testBot(): Unit = runBlocking {
+        val kfox = client.kfox("dev.bitflow.kfox")
+        kfox.listen()
         client.login()
+        return@runBlocking
     }
 }

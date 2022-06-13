@@ -1,12 +1,14 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
+import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
-import dev.kord.core.entity.application.GlobalApplicationCommand
+import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.ResolvableOptionValue
@@ -22,6 +24,7 @@ import mu.KotlinLogging
 import org.reflections.Reflections
 import org.reflections.scanners.Scanners
 import org.reflections.util.ConfigurationBuilder
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
@@ -31,11 +34,13 @@ import kotlin.reflect.jvm.kotlinFunction
 class KFox(
     reflections: Reflections,
     private val commands: Map<String, List<CommandData>>,
-    private val registry: ComponentRegistry = MemoryComponentRegistry()
+    private val registry: ComponentRegistry = MemoryComponentRegistry(),
+    eventsFlow: (KFox) -> SharedFlow<Event>
 ) : CoroutineScope {
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default
 
+    private val events: SharedFlow<Event> = eventsFlow(this)
     private val logger = KotlinLogging.logger {}
     private val localComponentCallbacks: Map<String, ComponentCallback>
 
@@ -85,9 +90,10 @@ class KFox(
     }
 
     @Suppress("unused")
-    fun listen(events: Flow<Event>): Job =
+    fun listen(): Job =
         events.buffer(Channel.UNLIMITED)
             .filterIsInstance<InteractionCreateEvent>()
+            .onEach { logger.debug { "Received interaction ${it.interaction.id}" } }
             .onEach { event ->
                 launch(event.coroutineContext) {
                     runCatching {
@@ -125,8 +131,9 @@ class KFox(
                                 }
 
                                 is ChatInputCommandInteractionCreateEvent -> {
-                                    val matchedCommands = commands[interaction.command.rootName]
-                                        ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
+                                    val matchedCommands =
+                                        commands[interaction.command.rootName] // TODO: Does not handle guild and global command conflicts
+                                            ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
 
                                     val localCommand = when (val command = interaction.command) {
                                         is dev.kord.core.entity.interaction.SubCommand -> {
@@ -162,6 +169,7 @@ class KFox(
                 }
             }
             .onStart { logger.info { "Started listening for interactions." } }
+            .onCompletion { logger.info { "Stopped listening for interactions." } }
             .launchIn(this)
 
     @OptIn(KordUnsafe::class)
@@ -330,12 +338,13 @@ fun scanForCommands(reflections: Reflections): List<CommandData> {
 
             val node = CommandData(
                 annotation.name,
-                annotation.description,
+                annotation.descriptionKey,
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.description, it)
+                    ParameterData(p?.name, p?.descriptionKey, it)
                 }.associateBy { it.parameter.name!! },
+                if (annotation.guild != Long.MIN_VALUE) Snowflake(annotation.guild) else null,
                 if (group == null) null else GroupData(group.name, group.description),
                 if (subCommand?.parent?.isEmpty() == true) null else subCommand?.parent
             )
@@ -345,19 +354,22 @@ fun scanForCommands(reflections: Reflections): List<CommandData> {
     return localCommands
 }
 
-private fun MultiApplicationCommandBuilder.registerCommands(localCommands: List<CommandData>) {
+private fun MultiApplicationCommandBuilder.registerCommands(
+    localCommands: List<CommandData>,
+    localization: Map<Locale, ResourceBundle>
+) {
     for (command in localCommands.filter { it.parent == null }) {
         val children = localCommands.filter { it.parent == command.name }
-        input(command.name, command.description) {
+        input(command.name, command.descriptionKey) {
             for (child in children) {
                 if (child.group != null)
                     group(child.group.name, child.group.description) {
-                        subCommand(child.name, child.description) {
+                        subCommand(child.name, child.descriptionKey) {
                             addParameters(child)
                         }
                     }
                 else
-                    subCommand(child.name, child.description) {
+                    subCommand(child.name, child.descriptionKey) {
                         addParameters(child)
                     }
             }
@@ -391,15 +403,17 @@ private fun BaseInputChatBuilder.addParameters(command: CommandData) {
     }
 }
 
+@OptIn(FlowPreview::class)
 suspend fun Kord.kfox(
     `package`: String,
+    localization: Map<Locale, ResourceBundle> = emptyMap(),
     registry: ComponentRegistry = MemoryComponentRegistry(),
     registerCommands: Boolean = true
 ): KFox {
     val reflections = Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
     val localCommands = scanForCommands(reflections)
 
-    suspend fun Flow<GlobalApplicationCommand>.associateCommands(): Map<String, List<CommandData>> = toList()
+    suspend fun Flow<ApplicationCommand>.associateCommands(): Map<String, List<CommandData>> = toList()
         .associate { command ->
             val localCommand =
                 localCommands.filter { it.name == command.name || it.parent == command.name }
@@ -408,13 +422,26 @@ suspend fun Kord.kfox(
         }
         .filterValues { it.isNotEmpty() }
 
-    return if (registerCommands)
+    return if (registerCommands) {
+        val localGlobal = localCommands.filter { it.guild == null }
+        val localGuild = localCommands.filter { it.guild != null }.groupBy { it.guild!! }
+        val global: Flow<ApplicationCommand> = if (localGlobal.isEmpty())
+            emptyFlow()
+        else
+            createGlobalApplicationCommands { registerCommands(localGlobal, localization) }
+        val guild: Flow<ApplicationCommand> = if (localGuild.isEmpty())
+            emptyFlow()
+        else
+            localGuild.map { createGuildApplicationCommands(it.key) { registerCommands(it.value, localization) } }
+                .merge()
         KFox(
             reflections,
-            createGlobalApplicationCommands { registerCommands(localCommands) }.associateCommands(),
+            merge(global, guild).associateCommands(),
             registry
-        )
-    else
-        KFox(reflections, getGlobalApplicationCommands().associateCommands(), registry)
+        ) { events }
+    } else {
+        // TODO: Doesn't include guild commands
+        KFox(reflections, getGlobalApplicationCommands().associateCommands(), registry) { events }
+    }
 }
 

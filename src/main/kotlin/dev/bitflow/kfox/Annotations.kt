@@ -3,7 +3,8 @@ package dev.bitflow.kfox
 @Target(AnnotationTarget.FUNCTION)
 annotation class Command(
     val name: String,
-    val description: String, // TODO: Localize these two
+    val descriptionKey: String,
+    val guild: Long = Long.MIN_VALUE
 )
 
 @Target(AnnotationTarget.FUNCTION)
@@ -18,8 +19,8 @@ annotation class Group(
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class Parameter(
-    val name: String, // TODO: Localize these two
-    val description: String
+    val name: String,
+    val descriptionKey: String
 )
 
 @Target(AnnotationTarget.FUNCTION)
