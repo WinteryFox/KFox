@@ -1,6 +1,7 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
+import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Snowflake
@@ -8,7 +9,6 @@ import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
-import dev.kord.core.entity.application.ApplicationCommand
 import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.OptionValue
 import dev.kord.core.entity.interaction.ResolvableOptionValue
@@ -24,7 +24,6 @@ import mu.KotlinLogging
 import org.reflections.Reflections
 import org.reflections.scanners.Scanners
 import org.reflections.util.ConfigurationBuilder
-import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
@@ -33,9 +32,7 @@ import kotlin.reflect.jvm.kotlinFunction
 
 class KFox(
     reflections: Reflections,
-    private val commands: Map<String, CommandData>,
-    val defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
-    private val bundles: Map<Locale, ResourceBundle>,
+    val translation: TranslationProvider,
     private val registry: ComponentRegistry = MemoryComponentRegistry(),
     eventsFlow: (KFox) -> SharedFlow<Event>
 ) : CoroutineScope {
@@ -44,9 +41,11 @@ class KFox(
 
     private val events: SharedFlow<Event> = eventsFlow(this)
     private val logger = KotlinLogging.logger {}
+    private val commands: Map<String, CommandData>
     private val localComponentCallbacks: Map<String, ComponentCallback>
 
     init {
+        commands = scanForCommands(translation, reflections).associateBy { it.defaultName }
         localComponentCallbacks =
             reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }
                 .associate { function ->
@@ -89,6 +88,31 @@ class KFox(
         logger.debug { "Reflection found ${localComponentCallbacks.size} component callbacks." }
         logger.debug { "Serving ${commands.size} commands." }
         logger.info { "KFox instance is ready!" }
+    }
+
+    internal suspend fun putCommands(kord: Kord): KFox {
+        val globalCommands = commands.values.filter { it.guild == null }
+        if (globalCommands.isNotEmpty())
+            kord.createGlobalApplicationCommands {
+                registerCommands(globalCommands, translation)
+            }.collect()
+
+        val guildCommands = commands.values.filter { it.guild != null }
+        if (guildCommands.isNotEmpty())
+            guildCommands
+                .groupBy { it.guild!! }
+                .map {
+                    kord.createGuildApplicationCommands(it.key) {
+                        registerCommands(
+                            it.value,
+                            translation
+                        )
+                    }
+                }
+                .merge()
+                .collect()
+
+        return this
     }
 
     @Suppress("unused")
@@ -207,7 +231,6 @@ class KFox(
                     ChatCommandContext(
                         kord,
                         kfox,
-                        bundles,
                         event as ChatInputCommandInteractionCreateEvent,
                         registry
                     )
@@ -216,7 +239,6 @@ class KFox(
                     PublicChatCommandContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -226,7 +248,6 @@ class KFox(
                     EphemeralChatCommandContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -236,7 +257,6 @@ class KFox(
                     ButtonContext(
                         kord,
                         kfox,
-                        bundles,
                         event as ButtonInteractionCreateEvent,
                         registry
                     )
@@ -245,7 +265,6 @@ class KFox(
                     PublicButtonContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -255,7 +274,6 @@ class KFox(
                     EphemeralButtonContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -265,7 +283,6 @@ class KFox(
                     SelectMenuContext(
                         kord,
                         kfox,
-                        bundles,
                         event as SelectMenuInteractionCreateEvent,
                         registry
                     )
@@ -274,7 +291,6 @@ class KFox(
                     PublicSelectMenuContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -284,7 +300,6 @@ class KFox(
                     EphemeralSelectMenuContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -294,7 +309,6 @@ class KFox(
                     ModalContext(
                         kord,
                         kfox,
-                        bundles,
                         event as ModalSubmitInteractionCreateEvent,
                         registry
                     )
@@ -303,7 +317,6 @@ class KFox(
                     PublicModalContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -313,7 +326,6 @@ class KFox(
                     EphemeralModalContext(
                         kord,
                         kfox,
-                        bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -349,7 +361,7 @@ class KFox(
     }
 }
 
-fun scanForCommands(defaultBundle: ResourceBundle, reflections: Reflections): List<CommandData> {
+fun scanForCommands(translationProvider: TranslationProvider, reflections: Reflections): List<CommandData> {
     val localCommands = reflections.getMethodsAnnotatedWith(Command::class.java)
         .map { it.kotlinFunction!! }
         .map { function ->
@@ -358,16 +370,22 @@ fun scanForCommands(defaultBundle: ResourceBundle, reflections: Reflections): Li
             val group = function.findAnnotation<Group>()
 
             CommandData(
-                defaultBundle.getString(annotation.nameKey),
-                defaultBundle.getString(annotation.descriptionKey),
+                translationProvider.getString(annotation.nameKey, locale = translationProvider.defaultLocale),
+                translationProvider.getString(annotation.descriptionKey, locale = translationProvider.defaultLocale),
                 annotation.nameKey,
                 annotation.descriptionKey,
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
                     ParameterData(
-                        if (p == null) null else defaultBundle.getString(p.nameKey),
-                        if (p == null) null else defaultBundle.getString(p.descriptionKey),
+                        if (p == null) null else translationProvider.getString(
+                            p.nameKey,
+                            locale = translationProvider.defaultLocale
+                        ),
+                        if (p == null) null else translationProvider.getString(
+                            p.descriptionKey,
+                            locale = translationProvider.defaultLocale
+                        ),
                         p?.nameKey,
                         p?.descriptionKey,
                         it
@@ -375,12 +393,15 @@ fun scanForCommands(defaultBundle: ResourceBundle, reflections: Reflections): Li
                 }.associateBy { it.parameter.name!! },
                 if (annotation.guild != Long.MIN_VALUE) Snowflake(annotation.guild) else null,
                 if (group == null) null else GroupData(
-                    defaultBundle.getString(group.nameKey),
-                    defaultBundle.getString(group.descriptionKey),
+                    translationProvider.getString(group.nameKey, locale = translationProvider.defaultLocale),
+                    translationProvider.getString(group.descriptionKey, locale = translationProvider.defaultLocale),
                     group.nameKey,
                     group.descriptionKey
                 ),
-                if (subCommand == null) null else defaultBundle.getString(subCommand.parentNameKey),
+                if (subCommand == null) null else translationProvider.getString(
+                    subCommand.parentNameKey,
+                    locale = translationProvider.defaultLocale
+                ),
                 emptyList()
             )
         }
@@ -395,15 +416,15 @@ fun scanForCommands(defaultBundle: ResourceBundle, reflections: Reflections): Li
 
 private fun MultiApplicationCommandBuilder.registerCommands(
     localCommands: List<CommandData>,
-    bundles: Map<Locale, ResourceBundle>
+    translationProvider: TranslationProvider
 ) {
     fun getLocalization(key: String): MutableMap<Locale, String> =
-        bundles.mapValues { it.value.getString(key) }.toMutableMap()
+        translationProvider.getAllStrings(key).toMutableMap()
 
     fun SubCommandBuilder.addSubCommand(command: CommandData) {
         nameLocalizations = getLocalization(command.nameKey)
         descriptionLocalizations = getLocalization(command.descriptionKey)
-        addParameters(bundles, command)
+        addParameters(translationProvider, command)
     }
 
     for (command in localCommands.filter { it.parent == null }) {
@@ -427,16 +448,15 @@ private fun MultiApplicationCommandBuilder.registerCommands(
                     }
             }
 
-            addParameters(bundles, command)
+            addParameters(translationProvider, command)
         }
     }
 }
 
-private fun BaseInputChatBuilder.addParameters(localization: Map<Locale, ResourceBundle>, command: CommandData) {
+private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationProvider, command: CommandData) {
     fun OptionsBuilder.localize(parameter: ParameterData) {
-        nameLocalizations = localization.mapValues { it.value.getString(parameter.nameKey) }.toMutableMap()
-        descriptionLocalizations =
-            localization.mapValues { it.value.getString(parameter.descriptionKey) }.toMutableMap()
+        nameLocalizations = translationProvider.getAllStrings(parameter.nameKey!!).toMutableMap()
+        descriptionLocalizations = translationProvider.getAllStrings(parameter.descriptionKey!!).toMutableMap()
     }
 
     for (parameter in command.parameters) {
@@ -483,47 +503,20 @@ private fun BaseInputChatBuilder.addParameters(localization: Map<Locale, Resourc
 
 suspend fun Kord.kfox(
     `package`: String,
-    bundles: Map<Locale, ResourceBundle>,
-    defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
+    translationProvider: TranslationProvider,
     registry: ComponentRegistry = MemoryComponentRegistry(),
     registerCommands: Boolean = true
-): KFox {
-    val reflections = Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
-    val localCommands = scanForCommands(bundles[defaultLocale]!!, reflections)
-
-    suspend fun Flow<ApplicationCommand>.associateCommands(): Map<String, CommandData> = toList()
-        .associate { applicationCommand -> applicationCommand.name to localCommands.find { applicationCommand.name == it.defaultName } }
-        .filterValues { it != null }
-        .mapValues { it.value!! }
-
-    return if (registerCommands) {
-        val localGlobal = localCommands.filter { it.guild == null }
-        val localGuild = localCommands.filter { it.guild != null }.groupBy { it.guild!! }
-        val global: Flow<ApplicationCommand> = if (localGlobal.isEmpty())
-            emptyFlow()
-        else
-            createGlobalApplicationCommands { registerCommands(localGlobal, bundles) }
-        val guild: Flow<ApplicationCommand> = if (localGuild.isEmpty())
-            emptyFlow()
-        else
-            localGuild.map { createGuildApplicationCommands(it.key) { registerCommands(it.value, bundles) } }
-                .merge()
-        KFox(
-            reflections,
-            merge(global, guild).associateCommands(),
-            defaultLocale,
-            bundles,
-            registry
-        ) { events }
-    } else {
-        // TODO: Doesn't include guild commands
-        KFox(
-            reflections,
-            getGlobalApplicationCommands().associateCommands(),
-            defaultLocale,
-            bundles,
-            registry
-        ) { events }
-    }
+): KFox = if (registerCommands) {
+    KFox(
+        Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)),
+        translationProvider,
+        registry
+    ) { events }.putCommands(this)
+} else {
+    KFox(
+        Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)),
+        translationProvider,
+        registry
+    ) { events }
 }
 

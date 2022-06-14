@@ -12,28 +12,25 @@ import java.util.*
 open class ButtonContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : ComponentContext(kord, kfox, event, bundles, registry)
+) : ComponentContext(kord, kfox, event, registry)
 
 class PublicButtonContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : ButtonContext(kord, kfox, bundles, event, registry)
+) : ButtonContext(kord, kfox, event, registry)
 
 class EphemeralButtonContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: ButtonInteractionCreateEvent,
     registry: ComponentRegistry
-) : ButtonContext(kord, kfox, bundles, event, registry)
+) : ButtonContext(kord, kfox, event, registry)

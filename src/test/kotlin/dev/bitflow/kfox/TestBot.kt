@@ -1,6 +1,7 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
+import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.entity.TextInputStyle
 import dev.kord.core.Kord
@@ -77,9 +78,15 @@ class TestBot {
         val bundleEn = ResourceBundle.getBundle("commands", java.util.Locale("en", "US"))
         val kfox = client.kfox(
             "dev.bitflow.kfox",
-            mapOf(
-                Pair(Locale("ja"), bundleJa),
-                Pair(Locale("en", "US"), bundleEn)
+            ResourceBundleTranslationProvider(
+                "commands",
+                Locale.ENGLISH_UNITED_STATES,
+                mapOf(
+                    "commands" to mapOf(
+                        Locale("ja") to bundleJa,
+                        Locale("en", "US") to bundleEn
+                    )
+                )
             )
         )
         kfox.listen()

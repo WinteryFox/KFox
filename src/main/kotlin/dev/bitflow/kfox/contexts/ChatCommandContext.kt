@@ -12,28 +12,25 @@ import java.util.*
 open class ChatCommandContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : CommandContext(kord, kfox, event, bundles, registry)
+) : CommandContext(kord, kfox, event, registry)
 
 class PublicChatCommandContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(kord, kfox, bundles, event, registry)
+) : ChatCommandContext(kord, kfox, event, registry)
 
 class EphemeralChatCommandContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(kord, kfox, bundles, event, registry)
+) : ChatCommandContext(kord, kfox, event, registry)

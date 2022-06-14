@@ -12,28 +12,25 @@ import java.util.*
 open class SelectMenuContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : ComponentContext(kord, kfox, event, bundles, registry)
+) : ComponentContext(kord, kfox, event, registry)
 
 class PublicSelectMenuContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : SelectMenuContext(kord, kfox, bundles, event, registry)
+) : SelectMenuContext(kord, kfox, event, registry)
 
 class EphemeralSelectMenuContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : SelectMenuContext(kord, kfox, bundles, event, registry)
+) : SelectMenuContext(kord, kfox, event, registry)

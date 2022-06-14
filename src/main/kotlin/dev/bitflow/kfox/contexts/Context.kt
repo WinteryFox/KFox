@@ -34,7 +34,6 @@ sealed class Context(
     val kord: Kord,
     val kfox: KFox,
     open val event: InteractionCreateEvent,
-    val bundles: Map<Locale, ResourceBundle>,
     private val registry: ComponentRegistry
 ) {
     @Suppress("unused")
@@ -52,47 +51,40 @@ sealed class Context(
         register(registry, callbackId)
     }
 
-    fun supportsLocale(locale: Locale) = bundles.containsKey(locale)
+    fun supportsLocale(locale: Locale) = kfox.translation.supportsLocale(locale)
 
-    fun getString(key: String, locale: Locale?, vararg params: List<Any>): String {
-        val bundle = bundles[locale]
-            ?: bundles[kfox.defaultLocale]
-        val string = if (bundle == null) key else try {
-            bundle.getString(key)
-        } catch (_: NullPointerException) {
-            key
-        }
-        return MessageFormat.format(string, params)
-    }
+    fun getString(
+        key: String,
+        vararg params: List<Any>,
+        locale: Locale = kfox.translation.defaultLocale,
+        module: String = kfox.translation.defaultModule
+    ): String = kfox.translation.getString(key, *params, locale = locale, module = module)
 
     fun getUserString(key: String, vararg params: List<Any>): String =
-        getString(key, event.interaction.locale, *params)
+        getString(key, *params, locale = event.interaction.locale ?: kfox.translation.defaultLocale)
 
     fun getGuildString(key: String, vararg params: List<Any>): String =
-        getString(key, event.interaction.guildLocale, *params)
+        getString(key, *params, locale = event.interaction.guildLocale ?: kfox.translation.defaultLocale)
 }
 
 sealed class CommandContext(
     kord: Kord,
     kfox: KFox,
     override val event: ApplicationCommandInteractionCreateEvent,
-    bundles: Map<Locale, ResourceBundle>,
     registry: ComponentRegistry
-) : Context(kord, kfox, event, bundles, registry)
+) : Context(kord, kfox, event, registry)
 
 sealed class ComponentContext(
     kord: Kord,
     kfox: KFox,
     override val event: ComponentInteractionCreateEvent,
-    bundles: Map<Locale, ResourceBundle>,
     registry: ComponentRegistry
-) : Context(kord, kfox, event, bundles, registry)
+) : Context(kord, kfox, event, registry)
 
 open class ModalContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     override val event: ModalSubmitInteractionCreateEvent,
     registry: ComponentRegistry
-) : Context(kord, kfox, event, bundles, registry)
+) : Context(kord, kfox, event, registry)

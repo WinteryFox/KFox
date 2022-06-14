@@ -12,19 +12,17 @@ import java.util.*
 class PublicModalContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: ModalSubmitInteractionCreateEvent,
     registry: ComponentRegistry
-) : ModalContext(kord, kfox, bundles, event, registry)
+) : ModalContext(kord, kfox, event, registry)
 
 class EphemeralModalContext(
     kord: Kord,
     kfox: KFox,
-    bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: ModalSubmitInteractionCreateEvent,
     registry: ComponentRegistry
-) : ModalContext(kord, kfox, bundles, event, registry)
+) : ModalContext(kord, kfox, event, registry)

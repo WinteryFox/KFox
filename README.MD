@@ -26,7 +26,7 @@ It will allow you to easily create and respond to any type of interaction that K
     - [ ] User commands
     - [ ] Message commands
     - [ ] Autocomplete
-    - [ ] Localization
+    - [x] Localization
 - [x] Buttons
 - [x] Select menus
 - [x] Modals
