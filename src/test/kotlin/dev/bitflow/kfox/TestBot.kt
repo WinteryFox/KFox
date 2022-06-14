@@ -44,16 +44,16 @@ suspend fun testCommand(
     value: String
 ) {
     with(context) {
-        event.interaction.modal("Hello!", "aaa") {
+        event.interaction.modal(getUserString("title"), "aaa") {
             actionRow {
-                textInput(TextInputStyle.Short, "poem", "Poetry night") {
-                    placeholder = "Let out your inner Shakespeare"
+                textInput(TextInputStyle.Short, "poem", getUserString("poetry")) {
+                    placeholder = getUserString("poetry-placeholder")
                 }
             }
 
             actionRow {
-                textInput(TextInputStyle.Short, "name", "What's your name?") {
-                    placeholder = "✨ Amy"
+                textInput(TextInputStyle.Short, "name", getUserString("name")) {
+                    placeholder = getUserString("name-placeholder")
                 }
             }
 
@@ -75,7 +75,6 @@ class TestBot {
     fun testBot(): Unit = runBlocking {
         val bundleJa = ResourceBundle.getBundle("commands", java.util.Locale("ja", "JP"))
         val bundleEn = ResourceBundle.getBundle("commands", java.util.Locale("en", "US"))
-        println(bundleJa.getString("parrot-desc"))
         val kfox = client.kfox(
             "dev.bitflow.kfox",
             mapOf(

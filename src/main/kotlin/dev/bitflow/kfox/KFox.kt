@@ -34,7 +34,7 @@ import kotlin.reflect.jvm.kotlinFunction
 class KFox(
     reflections: Reflections,
     private val commands: Map<String, CommandData>,
-    private val defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
+    val defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
     private val bundles: Map<Locale, ResourceBundle>,
     private val registry: ComponentRegistry = MemoryComponentRegistry(),
     eventsFlow: (KFox) -> SharedFlow<Event>
@@ -109,6 +109,7 @@ class KFox(
 
                                     callback.function.callSuspendByParameters(
                                         kord,
+                                        this@KFox,
                                         registry,
                                         this,
                                         interaction.textInputs
@@ -126,6 +127,7 @@ class KFox(
 
                                     callback.function.callSuspendByParameters(
                                         kord,
+                                        this@KFox,
                                         registry,
                                         this,
                                         emptyMap()
@@ -150,6 +152,7 @@ class KFox(
 
                                     localCommand.function.callSuspendByParameters(
                                         kord,
+                                        this@KFox,
                                         registry,
                                         this,
                                         suppliedParameters,
@@ -170,6 +173,7 @@ class KFox(
     @OptIn(KordUnsafe::class)
     private suspend fun KFunction<*>.callSuspendByParameters(
         kord: Kord,
+        kfox: KFox,
         registry: ComponentRegistry,
         event: InteractionCreateEvent,
         suppliedParameters: Map<String, Any?>,
@@ -202,6 +206,7 @@ class KFox(
                 ChatCommandContext::class ->
                     ChatCommandContext(
                         kord,
+                        kfox,
                         bundles,
                         event as ChatInputCommandInteractionCreateEvent,
                         registry
@@ -210,6 +215,7 @@ class KFox(
                 PublicChatCommandContext::class ->
                     PublicChatCommandContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
@@ -219,6 +225,7 @@ class KFox(
                 EphemeralChatCommandContext::class ->
                     EphemeralChatCommandContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
@@ -228,6 +235,7 @@ class KFox(
                 ButtonContext::class ->
                     ButtonContext(
                         kord,
+                        kfox,
                         bundles,
                         event as ButtonInteractionCreateEvent,
                         registry
@@ -236,6 +244,7 @@ class KFox(
                 PublicButtonContext::class ->
                     PublicButtonContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
@@ -245,6 +254,7 @@ class KFox(
                 EphemeralButtonContext::class ->
                     EphemeralButtonContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
@@ -254,6 +264,7 @@ class KFox(
                 SelectMenuContext::class ->
                     SelectMenuContext(
                         kord,
+                        kfox,
                         bundles,
                         event as SelectMenuInteractionCreateEvent,
                         registry
@@ -262,6 +273,7 @@ class KFox(
                 PublicSelectMenuContext::class ->
                     PublicSelectMenuContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
@@ -271,6 +283,7 @@ class KFox(
                 EphemeralSelectMenuContext::class ->
                     EphemeralSelectMenuContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
@@ -280,6 +293,7 @@ class KFox(
                 ModalContext::class ->
                     ModalContext(
                         kord,
+                        kfox,
                         bundles,
                         event as ModalSubmitInteractionCreateEvent,
                         registry
@@ -288,6 +302,7 @@ class KFox(
                 PublicModalContext::class ->
                     PublicModalContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
@@ -297,6 +312,7 @@ class KFox(
                 EphemeralModalContext::class ->
                     EphemeralModalContext(
                         kord,
+                        kfox,
                         bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,

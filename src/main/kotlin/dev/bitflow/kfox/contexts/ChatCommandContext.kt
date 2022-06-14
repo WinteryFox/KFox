@@ -1,6 +1,7 @@
 package dev.bitflow.kfox.contexts
 
 import dev.bitflow.kfox.ComponentRegistry
+import dev.bitflow.kfox.KFox
 import dev.kord.common.Locale
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
@@ -9,27 +10,30 @@ import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 import java.util.*
 
 open class ChatCommandContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
     bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
-    val event: ChatInputCommandInteractionCreateEvent,
+    event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : CommandContext(client, bundles, registry)
+) : CommandContext(kord, kfox, event, bundles, registry)
 
 class PublicChatCommandContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
     bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(client, bundles, event, registry)
+) : ChatCommandContext(kord, kfox, bundles, event, registry)
 
 class EphemeralChatCommandContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
     bundles: Map<Locale, ResourceBundle>,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : ChatCommandContext(client, bundles, event, registry)
+) : ChatCommandContext(kord, kfox, bundles, event, registry)
