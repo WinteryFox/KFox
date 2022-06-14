@@ -63,10 +63,10 @@ suspend fun main() {
 #### Creating a command
 
 ```kotlin
-@Command("parrot", "I'm a friendly parakeet, I'll repeat what you said awk!") // 1
+@Command("parrot-desc", "I'm a friendly parakeet, I'll repeat what you said awk!") // 1
 suspend fun testCommand(
     context: PublicChatCommandContext, // 2
-    @Parameter("content", "content-key") // 3
+    @Parameter("content-desc", "content-key") // 3
     value: String
 ) = with(context) {
     response.createPublicFollowup {

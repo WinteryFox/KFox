@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+val jvmVersion = JavaVersion.VERSION_17
 val kordVersion = "0.8.0-M14"
 
 plugins {
@@ -10,6 +11,7 @@ plugins {
 
 group = "dev.bitflow"
 version = "1.0-SNAPSHOT"
+java.sourceCompatibility = jvmVersion
 
 repositories {
     mavenCentral()
@@ -47,6 +49,7 @@ tasks.test {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions {
+        jvmTarget = jvmVersion.toString()
         freeCompilerArgs = freeCompilerArgs + listOf("-opt-in=kotlin.RequiresOptIn")
     }
 }

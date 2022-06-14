@@ -5,23 +5,29 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 
 data class ParameterData(
-    val name: String?,
-    val description: String?,
+    val defaultName: String?,
+    val defaultDescription: String?,
+    val nameKey: String?,
+    val descriptionKey: String?,
     val parameter: KParameter
 )
 
 data class CommandData(
-    val name: String,
+    val defaultName: String,
+    val defaultDescription: String,
+    val nameKey: String,
     val descriptionKey: String,
     val function: KFunction<*>,
-    val parameters: Map<String, ParameterData> = emptyMap(),
-    val guild: Snowflake? = null,
-    val group: GroupData? = null,
-    val parent: String? = null,
-    val children: MutableList<CommandData> = mutableListOf(),
+    val parameters: Map<String, ParameterData>,
+    val guild: Snowflake?,
+    val group: GroupData?,
+    val parent: String?,
+    val children: List<CommandData>
 )
 
 data class GroupData(
-    val name: String,
-    val description: String
+    val defaultName: String,
+    val defaultDescription: String,
+    val nameKey: String,
+    val descriptionKey: String,
 )

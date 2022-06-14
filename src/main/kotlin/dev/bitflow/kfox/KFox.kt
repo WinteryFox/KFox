@@ -33,7 +33,9 @@ import kotlin.reflect.jvm.kotlinFunction
 
 class KFox(
     reflections: Reflections,
-    private val commands: Map<String, List<CommandData>>,
+    private val commands: Map<String, CommandData>,
+    private val defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
+    private val bundles: Map<Locale, ResourceBundle>,
     private val registry: ComponentRegistry = MemoryComponentRegistry(),
     eventsFlow: (KFox) -> SharedFlow<Event>
 ) : CoroutineScope {
@@ -131,24 +133,17 @@ class KFox(
                                 }
 
                                 is ChatInputCommandInteractionCreateEvent -> {
-                                    val matchedCommands =
-                                        commands[interaction.command.rootName] // TODO: Does not handle guild and global command conflicts
-                                            ?: throw IllegalStateException("Bot command is not locally known (${interaction.command.rootId})")
+                                    val matchedCommand = commands[interaction.command.rootName]
+                                        ?: throw IllegalStateException("Bot command is not locally known \"${interaction.command.rootName}\" (${interaction.command.rootId}).")
 
                                     val localCommand = when (val command = interaction.command) {
-                                        is dev.kord.core.entity.interaction.SubCommand -> {
-                                            matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group == null }
-                                                ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
-                                        }
+                                        is dev.kord.core.entity.interaction.SubCommand -> matchedCommand.children.firstOrNull { it.defaultName == command.name && it.group == null }
+                                            ?: throw IllegalStateException("Subcommand ${command.rootName} -> ${command.name} is not locally known (${command.rootId}).")
 
-                                        is GroupCommand -> {
-                                            matchedCommands.firstOrNull { it.parent == command.rootName && it.name == command.name && it.group?.name == command.groupName }
-                                                ?: throw IllegalStateException("Subcommand ${command.rootId} -> ${command.name} is not locally known.")
-                                        }
+                                        is GroupCommand -> matchedCommand.children.firstOrNull { it.defaultName == command.name && it.group?.defaultName == command.groupName }
+                                            ?: throw IllegalStateException("Subcommand ${command.rootName} -> ${command.name} is not locally known (${command.rootId}).")
 
-                                        else -> {
-                                            matchedCommands.first()
-                                        }
+                                        else -> matchedCommand
                                     }
 
                                     val suppliedParameters = interaction.command.options.mapValues { it.value }
@@ -184,7 +179,7 @@ class KFox(
             val supplied = suppliedParameters
                 .entries
                 .find {
-                    it.key == (commandParameters[parameter.name]?.name ?: parameter.name)
+                    it.key == (commandParameters[parameter.name]?.defaultName ?: parameter.name)
                 }
 
             if (supplied != null) {
@@ -207,6 +202,7 @@ class KFox(
                 ChatCommandContext::class ->
                     ChatCommandContext(
                         kord,
+                        bundles,
                         event as ChatInputCommandInteractionCreateEvent,
                         registry
                     )
@@ -214,6 +210,7 @@ class KFox(
                 PublicChatCommandContext::class ->
                     PublicChatCommandContext(
                         kord,
+                        bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -222,6 +219,7 @@ class KFox(
                 EphemeralChatCommandContext::class ->
                     EphemeralChatCommandContext(
                         kord,
+                        bundles,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -230,6 +228,7 @@ class KFox(
                 ButtonContext::class ->
                     ButtonContext(
                         kord,
+                        bundles,
                         event as ButtonInteractionCreateEvent,
                         registry
                     )
@@ -237,6 +236,7 @@ class KFox(
                 PublicButtonContext::class ->
                     PublicButtonContext(
                         kord,
+                        bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -245,6 +245,7 @@ class KFox(
                 EphemeralButtonContext::class ->
                     EphemeralButtonContext(
                         kord,
+                        bundles,
                         (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -253,6 +254,7 @@ class KFox(
                 SelectMenuContext::class ->
                     SelectMenuContext(
                         kord,
+                        bundles,
                         event as SelectMenuInteractionCreateEvent,
                         registry
                     )
@@ -260,6 +262,7 @@ class KFox(
                 PublicSelectMenuContext::class ->
                     PublicSelectMenuContext(
                         kord,
+                        bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -268,6 +271,7 @@ class KFox(
                 EphemeralSelectMenuContext::class ->
                     EphemeralSelectMenuContext(
                         kord,
+                        bundles,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -276,6 +280,7 @@ class KFox(
                 ModalContext::class ->
                     ModalContext(
                         kord,
+                        bundles,
                         event as ModalSubmitInteractionCreateEvent,
                         registry
                     )
@@ -283,6 +288,7 @@ class KFox(
                 PublicModalContext::class ->
                     PublicModalContext(
                         kord,
+                        bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -291,6 +297,7 @@ class KFox(
                 EphemeralModalContext::class ->
                     EphemeralModalContext(
                         kord,
+                        bundles,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -326,76 +333,131 @@ class KFox(
     }
 }
 
-fun scanForCommands(reflections: Reflections): List<CommandData> {
-    val localCommands = mutableListOf<CommandData>()
-    reflections.getMethodsAnnotatedWith(Command::class.java)
+fun scanForCommands(defaultBundle: ResourceBundle, reflections: Reflections): List<CommandData> {
+    val localCommands = reflections.getMethodsAnnotatedWith(Command::class.java)
         .map { it.kotlinFunction!! }
-        .sortedBy { if (it.findAnnotation<SubCommand>() == null) 1 else -1 }
         .map { function ->
             val annotation = function.findAnnotation<Command>()!!
             val subCommand = function.findAnnotation<SubCommand>()
             val group = function.findAnnotation<Group>()
 
-            val node = CommandData(
-                annotation.name,
+            CommandData(
+                defaultBundle.getString(annotation.nameKey),
+                defaultBundle.getString(annotation.descriptionKey),
+                annotation.nameKey,
                 annotation.descriptionKey,
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
-                    ParameterData(p?.name, p?.descriptionKey, it)
+                    ParameterData(
+                        if (p == null) null else defaultBundle.getString(p.nameKey),
+                        if (p == null) null else defaultBundle.getString(p.descriptionKey),
+                        p?.nameKey,
+                        p?.descriptionKey,
+                        it
+                    )
                 }.associateBy { it.parameter.name!! },
                 if (annotation.guild != Long.MIN_VALUE) Snowflake(annotation.guild) else null,
-                if (group == null) null else GroupData(group.name, group.description),
-                if (subCommand?.parent?.isEmpty() == true) null else subCommand?.parent
+                if (group == null) null else GroupData(
+                    defaultBundle.getString(group.nameKey),
+                    defaultBundle.getString(group.descriptionKey),
+                    group.nameKey,
+                    group.descriptionKey
+                ),
+                if (subCommand == null) null else defaultBundle.getString(subCommand.parentNameKey),
+                emptyList()
             )
-
-            localCommands.add(node)
         }
+
     return localCommands
+        .map { c ->
+            c.copy(
+                children = localCommands.filter { it.parent != null && it.parent == c.defaultName }
+            )
+        }
 }
 
 private fun MultiApplicationCommandBuilder.registerCommands(
     localCommands: List<CommandData>,
-    localization: Map<Locale, ResourceBundle>
+    bundles: Map<Locale, ResourceBundle>
 ) {
+    fun getLocalization(key: String): MutableMap<Locale, String> =
+        bundles.mapValues { it.value.getString(key) }.toMutableMap()
+
+    fun SubCommandBuilder.addSubCommand(command: CommandData) {
+        nameLocalizations = getLocalization(command.nameKey)
+        descriptionLocalizations = getLocalization(command.descriptionKey)
+        addParameters(bundles, command)
+    }
+
     for (command in localCommands.filter { it.parent == null }) {
-        val children = localCommands.filter { it.parent == command.name }
-        input(command.name, command.descriptionKey) {
+        val children = localCommands.filter { it.parent == command.defaultName }
+        input(command.defaultName, command.defaultDescription) {
+            nameLocalizations = getLocalization(command.nameKey)
+            descriptionLocalizations = getLocalization(command.descriptionKey)
+
             for (child in children) {
                 if (child.group != null)
-                    group(child.group.name, child.group.description) {
-                        subCommand(child.name, child.descriptionKey) {
-                            addParameters(child)
+                    group(child.group.defaultName, child.group.defaultDescription) {
+                        nameLocalizations = getLocalization(child.group.nameKey)
+                        descriptionLocalizations = getLocalization(child.group.descriptionKey)
+                        subCommand(child.defaultName, child.defaultDescription) {
+                            addSubCommand(child)
                         }
                     }
                 else
-                    subCommand(child.name, child.descriptionKey) {
-                        addParameters(child)
+                    subCommand(child.defaultName, child.defaultDescription) {
+                        addSubCommand(child)
                     }
             }
 
-            addParameters(command)
+            addParameters(bundles, command)
         }
     }
 }
 
-private fun BaseInputChatBuilder.addParameters(command: CommandData) {
+private fun BaseInputChatBuilder.addParameters(localization: Map<Locale, ResourceBundle>, command: CommandData) {
+    fun OptionsBuilder.localize(parameter: ParameterData) {
+        nameLocalizations = localization.mapValues { it.value.getString(parameter.nameKey) }.toMutableMap()
+        descriptionLocalizations =
+            localization.mapValues { it.value.getString(parameter.descriptionKey) }.toMutableMap()
+    }
+
     for (parameter in command.parameters) {
-        val name = parameter.value.name
-        val description = parameter.value.description
+        val name = parameter.value.defaultName
+        val description = parameter.value.defaultDescription
         if (name == null || description == null)
             continue
 
         val nullable = parameter.value.parameter.type.isMarkedNullable
         when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description) { required = !nullable }
-            User::class -> user(name, description) { required = !nullable }
-            Boolean::class -> boolean(name, description) { required = !nullable }
-            Role::class -> role(name, description) { required = !nullable }
+            String::class -> string(name, description) {
+                localize(parameter.value)
+                required = !nullable
+            }
+
+            User::class -> user(name, description) {
+                localize(parameter.value)
+                required = !nullable
+            }
+
+            Boolean::class -> boolean(name, description) {
+                localize(parameter.value)
+                required = !nullable
+            }
+
+            Role::class -> role(name, description) {
+                localize(parameter.value)
+                required = !nullable
+            }
+
             dev.kord.core.entity.channel.Channel::class -> channel(
                 name,
                 description
-            ) { required = !nullable }
+            ) {
+                localize(parameter.value)
+                required = !nullable
+            }
 
             Attachment::class -> attachment(name, description) { required = !nullable }
             else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
@@ -403,24 +465,20 @@ private fun BaseInputChatBuilder.addParameters(command: CommandData) {
     }
 }
 
-@OptIn(FlowPreview::class)
 suspend fun Kord.kfox(
     `package`: String,
-    localization: Map<Locale, ResourceBundle> = emptyMap(),
+    bundles: Map<Locale, ResourceBundle>,
+    defaultLocale: Locale = Locale.ENGLISH_UNITED_STATES,
     registry: ComponentRegistry = MemoryComponentRegistry(),
     registerCommands: Boolean = true
 ): KFox {
     val reflections = Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
-    val localCommands = scanForCommands(reflections)
+    val localCommands = scanForCommands(bundles[defaultLocale]!!, reflections)
 
-    suspend fun Flow<ApplicationCommand>.associateCommands(): Map<String, List<CommandData>> = toList()
-        .associate { command ->
-            val localCommand =
-                localCommands.filter { it.name == command.name || it.parent == command.name }
-
-            command.name to localCommand
-        }
-        .filterValues { it.isNotEmpty() }
+    suspend fun Flow<ApplicationCommand>.associateCommands(): Map<String, CommandData> = toList()
+        .associate { applicationCommand -> applicationCommand.name to localCommands.find { applicationCommand.name == it.defaultName } }
+        .filterValues { it != null }
+        .mapValues { it.value!! }
 
     return if (registerCommands) {
         val localGlobal = localCommands.filter { it.guild == null }
@@ -428,20 +486,28 @@ suspend fun Kord.kfox(
         val global: Flow<ApplicationCommand> = if (localGlobal.isEmpty())
             emptyFlow()
         else
-            createGlobalApplicationCommands { registerCommands(localGlobal, localization) }
+            createGlobalApplicationCommands { registerCommands(localGlobal, bundles) }
         val guild: Flow<ApplicationCommand> = if (localGuild.isEmpty())
             emptyFlow()
         else
-            localGuild.map { createGuildApplicationCommands(it.key) { registerCommands(it.value, localization) } }
+            localGuild.map { createGuildApplicationCommands(it.key) { registerCommands(it.value, bundles) } }
                 .merge()
         KFox(
             reflections,
             merge(global, guild).associateCommands(),
+            defaultLocale,
+            bundles,
             registry
         ) { events }
     } else {
         // TODO: Doesn't include guild commands
-        KFox(reflections, getGlobalApplicationCommands().associateCommands(), registry) { events }
+        KFox(
+            reflections,
+            getGlobalApplicationCommands().associateCommands(),
+            defaultLocale,
+            bundles,
+            registry
+        ) { events }
     }
 }
 

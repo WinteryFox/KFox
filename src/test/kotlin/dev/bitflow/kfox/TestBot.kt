@@ -1,15 +1,16 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
+import dev.kord.common.Locale
 import dev.kord.common.entity.TextInputStyle
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.modal
+import dev.kord.core.behavior.interaction.respondEphemeral
 import dev.kord.core.behavior.interaction.response.createPublicFollowup
 import kotlinx.coroutines.runBlocking
+import java.util.*
 import kotlin.test.Test
 
-const val BUTTON_CALLBACK = "button"
-const val MENU_CALLBACK = "menu"
 const val MODAL_CALLBACK = "modal"
 
 @Modal(MODAL_CALLBACK)
@@ -25,47 +26,21 @@ suspend fun modal(
     }
 }
 
-@Button(BUTTON_CALLBACK)
-suspend fun testButton(
-    context: PublicButtonContext
-) {
-    with(context) {
-        response.createPublicFollowup {
-            content = "Awk!"
-        }
-    }
+@Command("root-name", "root-desc", 809278232100077629L)
+suspend fun root() {
 }
 
-@SelectMenu(MENU_CALLBACK)
-suspend fun testMenu(
-    context: PublicSelectMenuContext
-) {
-    with(context) {
-        response.createPublicFollowup {
-            content = "You picked \"${event.interaction.values.first()}\"! Awk!"
-        }
-    }
+@Command("sub-name", "sub-desc", 809278232100077629L)
+@SubCommand("root-name")
+@Group("group-name", "group-desc")
+suspend fun sub(context: ChatCommandContext) = with(context) {
+    event.interaction.respondEphemeral { content = "This is a sub-command" }
 }
 
-@Command("test", "test", 809278232100077629L)
-fun test() {}
-
-@Command("sub", "Test", 809278232100077629L)
-@SubCommand("test")
-suspend fun testSub(
-    context: PublicChatCommandContext,
-    @Parameter("value", "content-key")
-    value: String?
-) {
-    context.response.createPublicFollowup {
-        content = "Your value was $value"
-    }
-}
-
-@Command("parrot", "parrot-key", 809278232100077629L)
+@Command("parrot-name", "parrot-desc", 809278232100077629L)
 suspend fun testCommand(
     context: ChatCommandContext,
-    @Parameter("content", "content-key")
+    @Parameter("content-name", "content-desc")
     value: String
 ) {
     with(context) {
@@ -87,17 +62,6 @@ suspend fun testCommand(
     }
 }
 
-@Command("parakeet", "Something", 809278232100077629L)
-@SubCommand("birds")
-@Group("parakeet", "This group contains birbs")
-suspend fun subCommandWithCategory(
-    context: PublicChatCommandContext
-) {
-    context.response.createPublicFollowup {
-        content = "It's Friday my dudes"
-    }
-}
-
 class TestBot {
     private var client: Kord
 
@@ -109,7 +73,16 @@ class TestBot {
 
     @Test
     fun testBot(): Unit = runBlocking {
-        val kfox = client.kfox("dev.bitflow.kfox")
+        val bundleJa = ResourceBundle.getBundle("commands", java.util.Locale("ja", "JP"))
+        val bundleEn = ResourceBundle.getBundle("commands", java.util.Locale("en", "US"))
+        println(bundleJa.getString("parrot-desc"))
+        val kfox = client.kfox(
+            "dev.bitflow.kfox",
+            mapOf(
+                Pair(Locale("ja"), bundleJa),
+                Pair(Locale("en", "US"), bundleEn)
+            )
+        )
         kfox.listen()
         client.login()
         return@runBlocking
