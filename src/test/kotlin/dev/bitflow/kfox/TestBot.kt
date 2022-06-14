@@ -27,18 +27,18 @@ suspend fun modal(
     }
 }
 
-@Command("root-name", "root-desc", 809278232100077629L)
+@Command("root-name", "root-desc", guild = 809278232100077629L)
 suspend fun root() {
 }
 
-@Command("sub-name", "sub-desc", 809278232100077629L)
+@Command("sub-name", "sub-desc", guild = 809278232100077629L)
 @SubCommand("root-name")
 @Group("group-name", "group-desc")
 suspend fun sub(context: ChatCommandContext) = with(context) {
     event.interaction.respondEphemeral { content = "This is a sub-command" }
 }
 
-@Command("parrot-name", "parrot-desc", 809278232100077629L)
+@Command("parrot-name", "parrot-desc", guild = 809278232100077629L)
 suspend fun testCommand(
     context: ChatCommandContext,
     @Parameter("content-name", "content-desc")

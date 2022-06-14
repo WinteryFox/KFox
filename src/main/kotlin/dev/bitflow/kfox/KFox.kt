@@ -370,8 +370,16 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val group = function.findAnnotation<Group>()
 
             CommandData(
-                translationProvider.getString(annotation.nameKey, locale = translationProvider.defaultLocale),
-                translationProvider.getString(annotation.descriptionKey, locale = translationProvider.defaultLocale),
+                translationProvider.getString(
+                    annotation.nameKey,
+                    locale = translationProvider.defaultLocale,
+                    module = annotation.translationModule
+                ),
+                translationProvider.getString(
+                    annotation.descriptionKey,
+                    locale = translationProvider.defaultLocale,
+                    module = annotation.translationModule
+                ),
                 annotation.nameKey,
                 annotation.descriptionKey,
                 function,
@@ -380,11 +388,13 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     ParameterData(
                         if (p == null) null else translationProvider.getString(
                             p.nameKey,
-                            locale = translationProvider.defaultLocale
+                            locale = translationProvider.defaultLocale,
+                            module = p.translationModule
                         ),
                         if (p == null) null else translationProvider.getString(
                             p.descriptionKey,
-                            locale = translationProvider.defaultLocale
+                            locale = translationProvider.defaultLocale,
+                            module = p.translationModule
                         ),
                         p?.nameKey,
                         p?.descriptionKey,
@@ -393,14 +403,23 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                 }.associateBy { it.parameter.name!! },
                 if (annotation.guild != Long.MIN_VALUE) Snowflake(annotation.guild) else null,
                 if (group == null) null else GroupData(
-                    translationProvider.getString(group.nameKey, locale = translationProvider.defaultLocale),
-                    translationProvider.getString(group.descriptionKey, locale = translationProvider.defaultLocale),
+                    translationProvider.getString(
+                        group.nameKey,
+                        locale = translationProvider.defaultLocale,
+                        module = group.translationModule
+                    ),
+                    translationProvider.getString(
+                        group.descriptionKey,
+                        locale = translationProvider.defaultLocale,
+                        module = group.translationModule
+                    ),
                     group.nameKey,
                     group.descriptionKey
                 ),
                 if (subCommand == null) null else translationProvider.getString(
                     subCommand.parentNameKey,
-                    locale = translationProvider.defaultLocale
+                    locale = translationProvider.defaultLocale,
+                    module = subCommand.translationModule
                 ),
                 emptyList()
             )

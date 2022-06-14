@@ -14,11 +14,13 @@ class ResourceBundleTranslationProvider(
         modules[module]?.get(locale) != null
 
     override fun getAllLocales(module: String): Set<Locale> =
-        modules[module]?.map { it.key }?.toSet() ?: throw NullPointerException("Translation module not found \"$module\"")
+        modules[module]?.map { it.key }?.toSet()
+            ?: throw NullPointerException("Translation module not found \"$module\"")
 
     override fun getString(key: String, vararg params: List<Any>, locale: Locale, module: String): String {
-        val bundle = modules[module]?.get(locale)
-        val string = if (bundle == null) key else try {
+        val bundle =
+            modules[module]?.get(locale) ?: throw NullPointerException("Translation module not found \"$module\"")
+        val string = try {
             bundle.getString(key)
         } catch (_: NullPointerException) {
             key
