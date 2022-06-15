@@ -1,6 +1,9 @@
 package dev.bitflow.kfox
 
 import dev.bitflow.kfox.contexts.*
+import dev.bitflow.kfox.data.*
+import dev.bitflow.kfox.data.ComponentCallback
+import dev.bitflow.kfox.data.ModalComponentCallback
 import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
@@ -53,7 +56,8 @@ class KFox(
 
                     annotation.callbackId to ComponentCallback(
                         annotation.callbackId,
-                        function
+                        function,
+                        function.findAnnotation<Module>()?.module ?: translation.defaultModule
                     )
                 } +
                     reflections.getMethodsAnnotatedWith(SelectMenu::class.java).map { it.kotlinFunction!! }
@@ -62,13 +66,13 @@ class KFox(
 
                             annotation.callbackId to ComponentCallback(
                                 annotation.callbackId,
-                                function
+                                function,
+                                function.findAnnotation<Module>()?.module ?: translation.defaultModule
                             )
                         } +
                     reflections.getMethodsAnnotatedWith(Modal::class.java).map { it.kotlinFunction!! }
                         .associate { function ->
                             val annotation = function.findAnnotation<Modal>()!!
-
                             val params: MutableMap<String, String> = mutableMapOf()
 
                             for (param in function.parameters) {
@@ -82,7 +86,8 @@ class KFox(
                             annotation.callbackId to ModalComponentCallback(
                                 annotation.callbackId,
                                 function,
-                                params
+                                params,
+                                function.findAnnotation<Module>()?.module ?: translation.defaultModule
                             )
                         }
         logger.debug { "Reflection found ${localComponentCallbacks.size} component callbacks." }
@@ -90,7 +95,7 @@ class KFox(
         logger.info { "KFox instance is ready!" }
     }
 
-    internal suspend fun putCommands(kord: Kord): KFox {
+    suspend fun putCommands(kord: Kord): KFox {
         val globalCommands = commands.values.filter { it.guild == null }
         if (globalCommands.isNotEmpty())
             kord.createGlobalApplicationCommands {
@@ -134,6 +139,7 @@ class KFox(
                                     callback.function.callSuspendByParameters(
                                         kord,
                                         this@KFox,
+                                        callback.translationModule,
                                         registry,
                                         this,
                                         interaction.textInputs
@@ -152,6 +158,7 @@ class KFox(
                                     callback.function.callSuspendByParameters(
                                         kord,
                                         this@KFox,
+                                        callback.translationModule,
                                         registry,
                                         this,
                                         emptyMap()
@@ -177,6 +184,7 @@ class KFox(
                                     localCommand.function.callSuspendByParameters(
                                         kord,
                                         this@KFox,
+                                        localCommand.translationModule,
                                         registry,
                                         this,
                                         suppliedParameters,
@@ -198,6 +206,7 @@ class KFox(
     private suspend fun KFunction<*>.callSuspendByParameters(
         kord: Kord,
         kfox: KFox,
+        translationModule: String,
         registry: ComponentRegistry,
         event: InteractionCreateEvent,
         suppliedParameters: Map<String, Any?>,
@@ -231,6 +240,7 @@ class KFox(
                     ChatCommandContext(
                         kord,
                         kfox,
+                        translationModule,
                         event as ChatInputCommandInteractionCreateEvent,
                         registry
                     )
@@ -239,6 +249,7 @@ class KFox(
                     PublicChatCommandContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -248,6 +259,7 @@ class KFox(
                     EphemeralChatCommandContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -257,6 +269,7 @@ class KFox(
                     ButtonContext(
                         kord,
                         kfox,
+                        translationModule,
                         event as ButtonInteractionCreateEvent,
                         registry
                     )
@@ -265,6 +278,7 @@ class KFox(
                     PublicButtonContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -274,6 +288,7 @@ class KFox(
                     EphemeralButtonContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -283,6 +298,7 @@ class KFox(
                     SelectMenuContext(
                         kord,
                         kfox,
+                        translationModule,
                         event as SelectMenuInteractionCreateEvent,
                         registry
                     )
@@ -291,6 +307,7 @@ class KFox(
                     PublicSelectMenuContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -300,6 +317,7 @@ class KFox(
                     EphemeralSelectMenuContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -309,6 +327,7 @@ class KFox(
                     ModalContext(
                         kord,
                         kfox,
+                        translationModule,
                         event as ModalSubmitInteractionCreateEvent,
                         registry
                     )
@@ -317,6 +336,7 @@ class KFox(
                     PublicModalContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
                         registry
@@ -326,6 +346,7 @@ class KFox(
                     EphemeralModalContext(
                         kord,
                         kfox,
+                        translationModule,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
                         registry
@@ -366,6 +387,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
         .map { it.kotlinFunction!! }
         .map { function ->
             val annotation = function.findAnnotation<Command>()!!
+            val module = function.findAnnotation<Module>()?.module ?: translationProvider.defaultModule
             val subCommand = function.findAnnotation<SubCommand>()
             val group = function.findAnnotation<Group>()
 
@@ -373,31 +395,35 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                 translationProvider.getString(
                     annotation.nameKey,
                     locale = translationProvider.defaultLocale,
-                    module = annotation.translationModule
+                    module = module
                 ),
                 translationProvider.getString(
                     annotation.descriptionKey,
                     locale = translationProvider.defaultLocale,
-                    module = annotation.translationModule
+                    module = module
                 ),
                 annotation.nameKey,
                 annotation.descriptionKey,
+                module,
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
+                    val pModule = it.findAnnotation<Module>()?.module ?: translationProvider.defaultModule
+
                     ParameterData(
                         if (p == null) null else translationProvider.getString(
                             p.nameKey,
                             locale = translationProvider.defaultLocale,
-                            module = p.translationModule
+                            module = pModule
                         ),
                         if (p == null) null else translationProvider.getString(
                             p.descriptionKey,
                             locale = translationProvider.defaultLocale,
-                            module = p.translationModule
+                            module = pModule
                         ),
                         p?.nameKey,
                         p?.descriptionKey,
+                        pModule,
                         it
                     )
                 }.associateBy { it.parameter.name!! },
@@ -406,12 +432,12 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     translationProvider.getString(
                         group.nameKey,
                         locale = translationProvider.defaultLocale,
-                        module = group.translationModule
+                        module = module
                     ),
                     translationProvider.getString(
                         group.descriptionKey,
                         locale = translationProvider.defaultLocale,
-                        module = group.translationModule
+                        module = module
                     ),
                     group.nameKey,
                     group.descriptionKey
@@ -419,7 +445,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                 if (subCommand == null) null else translationProvider.getString(
                     subCommand.parentNameKey,
                     locale = translationProvider.defaultLocale,
-                    module = subCommand.translationModule
+                    module = module
                 ),
                 emptyList()
             )
@@ -437,26 +463,27 @@ private fun MultiApplicationCommandBuilder.registerCommands(
     localCommands: List<CommandData>,
     translationProvider: TranslationProvider
 ) {
-    fun getLocalization(key: String): MutableMap<Locale, String> =
-        translationProvider.getAllStrings(key).toMutableMap()
+    fun getLocalization(key: String, module: String): MutableMap<Locale, String> =
+        translationProvider.getAllStrings(key, module = module).toMutableMap()
 
     fun SubCommandBuilder.addSubCommand(command: CommandData) {
-        nameLocalizations = getLocalization(command.nameKey)
-        descriptionLocalizations = getLocalization(command.descriptionKey)
+        nameLocalizations = getLocalization(command.nameKey, command.translationModule)
+        descriptionLocalizations = getLocalization(command.descriptionKey, command.translationModule)
         addParameters(translationProvider, command)
     }
 
     for (command in localCommands.filter { it.parent == null }) {
         val children = localCommands.filter { it.parent == command.defaultName }
         input(command.defaultName, command.defaultDescription) {
-            nameLocalizations = getLocalization(command.nameKey)
-            descriptionLocalizations = getLocalization(command.descriptionKey)
+            nameLocalizations = getLocalization(command.nameKey, command.translationModule)
+            descriptionLocalizations = getLocalization(command.descriptionKey, command.translationModule)
 
             for (child in children) {
                 if (child.group != null)
                     group(child.group.defaultName, child.group.defaultDescription) {
-                        nameLocalizations = getLocalization(child.group.nameKey)
-                        descriptionLocalizations = getLocalization(child.group.descriptionKey)
+                        nameLocalizations = getLocalization(child.group.nameKey, command.translationModule)
+                        descriptionLocalizations =
+                            getLocalization(child.group.descriptionKey, command.translationModule)
                         subCommand(child.defaultName, child.defaultDescription) {
                             addSubCommand(child)
                         }

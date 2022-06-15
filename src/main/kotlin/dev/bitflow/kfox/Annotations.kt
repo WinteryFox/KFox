@@ -1,30 +1,31 @@
 package dev.bitflow.kfox
 
 @Target(AnnotationTarget.FUNCTION)
+annotation class Module(
+    val module: String
+)
+
+@Target(AnnotationTarget.FUNCTION)
 annotation class Command(
     val nameKey: String,
     val descriptionKey: String,
-    val translationModule: String = "",
     val guild: Long = Long.MIN_VALUE
 )
 
 @Target(AnnotationTarget.FUNCTION)
 annotation class SubCommand(
-    val parentNameKey: String,
-    val translationModule: String = ""
+    val parentNameKey: String
 )
 
 annotation class Group(
     val nameKey: String,
-    val descriptionKey: String,
-    val translationModule: String = ""
+    val descriptionKey: String
 )
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class Parameter(
     val nameKey: String,
-    val descriptionKey: String,
-    val translationModule: String = ""
+    val descriptionKey: String
 )
 
 @Target(AnnotationTarget.FUNCTION)

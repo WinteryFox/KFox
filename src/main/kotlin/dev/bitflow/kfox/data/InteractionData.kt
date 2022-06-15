@@ -1,4 +1,4 @@
-package dev.bitflow.kfox
+package dev.bitflow.kfox.data
 
 import dev.kord.common.entity.Snowflake
 import kotlin.reflect.KFunction
@@ -9,6 +9,7 @@ data class ParameterData(
     val defaultDescription: String?,
     val nameKey: String?,
     val descriptionKey: String?,
+    val translationModule: String?,
     val parameter: KParameter
 )
 
@@ -17,6 +18,7 @@ data class CommandData(
     val defaultDescription: String,
     val nameKey: String,
     val descriptionKey: String,
+    val translationModule: String,
     val function: KFunction<*>,
     val parameters: Map<String, ParameterData>,
     val guild: Snowflake?,
@@ -29,5 +31,18 @@ data class GroupData(
     val defaultName: String,
     val defaultDescription: String,
     val nameKey: String,
-    val descriptionKey: String,
+    val descriptionKey: String
 )
+
+internal open class ComponentCallback(
+    val callbackId: String,
+    val function: KFunction<*>,
+    val translationModule: String
+)
+
+internal class ModalComponentCallback(
+    callbackId: String,
+    function: KFunction<*>,
+    val params: Map<String, String>,
+    translationModule: String
+) : ComponentCallback(callbackId, function, translationModule)
