@@ -53,12 +53,12 @@ sealed class Context(
 
     fun getString(
         key: String,
-        vararg params: List<Any>,
+        vararg params: Any,
         locale: Locale = kfox.translation.defaultLocale,
         module: String = translationModule
     ): String = kfox.translation.getString(key, *params, locale = locale, module = module)
 
-    fun getUserString(key: String, vararg params: List<Any>, module: String = translationModule): String =
+    fun getUserString(key: String, vararg params: Any, module: String = translationModule): String =
         getString(
             key,
             *params,
@@ -66,7 +66,7 @@ sealed class Context(
             module = module
         )
 
-    fun getGuildString(key: String, vararg params: List<Any>, module: String = translationModule): String =
+    fun getGuildString(key: String, vararg params: Any, module: String = translationModule): String =
         getString(
             key,
             *params,

@@ -7,12 +7,22 @@ import dev.kord.common.entity.TextInputStyle
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.modal
 import dev.kord.core.behavior.interaction.respondEphemeral
+import dev.kord.core.behavior.interaction.response.createEphemeralFollowup
 import dev.kord.core.behavior.interaction.response.createPublicFollowup
 import kotlinx.coroutines.runBlocking
-import java.util.*
 import kotlin.test.Test
 
 const val MODAL_CALLBACK = "modal"
+
+@Command("name", "description", guild = 809278232100077629L)
+@Module("help")
+suspend fun help(
+    context: EphemeralChatCommandContext
+) = with(context) {
+    response.createEphemeralFollowup {
+        content = getUserString("content")
+    }
+}
 
 @Modal(MODAL_CALLBACK)
 suspend fun modal(
@@ -45,7 +55,7 @@ suspend fun testCommand(
     value: String
 ) {
     with(context) {
-        event.interaction.modal(getUserString("title"), "aaa") {
+        event.interaction.modal(getUserString("name"), "aaa") {
             actionRow {
                 textInput(TextInputStyle.Short, "poem", getUserString("poetry")) {
                     placeholder = getUserString("poetry-placeholder")
@@ -74,21 +84,9 @@ class TestBot {
 
     @Test
     fun testBot(): Unit = runBlocking {
-        val bundleJa = ResourceBundle.getBundle("commands", java.util.Locale("ja", "JP"))
-        val bundleEn = ResourceBundle.getBundle("commands", java.util.Locale("en", "US"))
-        val kfox = client.kfox(
-            "dev.bitflow.kfox",
-            ResourceBundleTranslationProvider(
-                "commands",
-                Locale.ENGLISH_UNITED_STATES,
-                mapOf(
-                    "commands" to mapOf(
-                        Locale("ja") to bundleJa,
-                        Locale("en", "US") to bundleEn
-                    )
-                )
-            )
-        )
+        val translationProvider =
+            ResourceBundleTranslationProvider("test", Locale.ENGLISH_UNITED_STATES)
+        val kfox = client.kfox("dev.bitflow.kfox", translationProvider)
         kfox.listen()
         client.login()
         return@runBlocking

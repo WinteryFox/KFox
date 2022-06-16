@@ -95,12 +95,17 @@ class KFox(
         logger.info { "KFox instance is ready!" }
     }
 
-    suspend fun putCommands(kord: Kord): KFox {
+    suspend fun putCommands(kord: Kord, snowflake: Snowflake? = null): KFox {
         val globalCommands = commands.values.filter { it.guild == null }
         if (globalCommands.isNotEmpty())
-            kord.createGlobalApplicationCommands {
-                registerCommands(globalCommands, translation)
-            }.collect()
+            if (snowflake == null)
+                kord.createGlobalApplicationCommands {
+                    registerCommands(globalCommands, translation)
+                }.collect()
+            else
+                kord.createGuildApplicationCommands(snowflake) {
+                    registerCommands(globalCommands, translation)
+                }.collect()
 
         val guildCommands = commands.values.filter { it.guild != null }
         if (guildCommands.isNotEmpty())
@@ -124,7 +129,7 @@ class KFox(
     fun listen(): Job =
         events.buffer(Channel.UNLIMITED)
             .filterIsInstance<InteractionCreateEvent>()
-            .onEach { logger.debug { "Received interaction ${it.interaction.id}" } }
+            .onEach { logger.trace { "Received interaction ${it.interaction.id}" } }
             .onEach { event ->
                 launch(event.coroutineContext) {
                     runCatching {

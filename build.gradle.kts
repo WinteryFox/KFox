@@ -27,6 +27,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.2")
+    api("com.ibm.icu:icu4j:71.1")
 
     implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
     runtimeOnly("org.slf4j:slf4j-api:1.7.36")

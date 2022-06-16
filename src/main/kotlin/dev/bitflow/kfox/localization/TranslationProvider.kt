@@ -1,5 +1,6 @@
 package dev.bitflow.kfox.localization
 
+import com.ibm.icu.text.MessageFormat
 import dev.kord.common.Locale
 
 interface TranslationProvider {
@@ -11,7 +12,14 @@ interface TranslationProvider {
 
     fun getAllLocales(module: String = defaultModule): Set<Locale>
 
-    fun getString(key: String, vararg params: List<Any>, locale: Locale = defaultLocale, module: String = defaultModule): String
+    fun getString(
+        key: String,
+        vararg params: Any,
+        locale: Locale = defaultLocale,
+        module: String = defaultModule
+    ): String
 
-    fun getAllStrings(key: String, vararg params: List<Any>, module: String = defaultModule): Map<Locale, String>
+    fun getAllStrings(key: String, module: String = defaultModule): Map<Locale, String>
+
+    fun format(value: String, vararg params: Any): String = MessageFormat.format(value, *params)
 }
