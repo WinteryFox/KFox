@@ -413,7 +413,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                 function,
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
-                    val pModule = it.findAnnotation<Module>()?.module ?: translationProvider.defaultModule
+                    val pModule = it.findAnnotation<Module>()?.module ?: module
 
                     ParameterData(
                         if (p == null) null else translationProvider.getString(
@@ -448,7 +448,11 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     group.descriptionKey
                 ),
                 if (subCommand == null) null else translationProvider.getString(
-                    subCommand.parentNameKey,
+                    translationProvider.getString(
+                        subCommand.parentNameKey,
+                        locale = translationProvider.defaultLocale,
+                        module = module
+                    ),
                     locale = translationProvider.defaultLocale,
                     module = module
                 ),
@@ -506,8 +510,14 @@ private fun MultiApplicationCommandBuilder.registerCommands(
 
 private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationProvider, command: CommandData) {
     fun OptionsBuilder.localize(parameter: ParameterData) {
-        nameLocalizations = translationProvider.getAllStrings(parameter.nameKey!!).toMutableMap()
-        descriptionLocalizations = translationProvider.getAllStrings(parameter.descriptionKey!!).toMutableMap()
+        nameLocalizations = translationProvider.getAllStrings(
+            parameter.nameKey!!,
+            module = parameter.translationModule!!
+        ).toMutableMap()
+        descriptionLocalizations = translationProvider.getAllStrings(
+            parameter.descriptionKey!!,
+            module = parameter.translationModule
+        ).toMutableMap()
     }
 
     for (parameter in command.parameters) {
