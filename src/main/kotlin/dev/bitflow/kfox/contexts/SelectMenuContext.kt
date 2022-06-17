@@ -1,30 +1,37 @@
 package dev.bitflow.kfox.contexts
 
-import dev.bitflow.kfox.ComponentRegistry
+import dev.bitflow.kfox.data.ComponentRegistry
+import dev.bitflow.kfox.KFox
 import dev.kord.core.Kord
 import dev.kord.core.behavior.interaction.response.EphemeralMessageInteractionResponseBehavior
 import dev.kord.core.behavior.interaction.response.PublicMessageInteractionResponseBehavior
 import dev.kord.core.event.interaction.SelectMenuInteractionCreateEvent
 
 open class SelectMenuContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
+    translationModule: String,
     @Suppress("unused")
-    val event: SelectMenuInteractionCreateEvent,
+    event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : ComponentContext(client, registry)
+) : ComponentContext(kord, kfox, translationModule, event, registry)
 
 class PublicSelectMenuContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
+    translationModule: String,
     @Suppress("unused")
     val response: PublicMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : SelectMenuContext(client, event, registry)
+) : SelectMenuContext(kord, kfox, translationModule, event, registry)
 
 class EphemeralSelectMenuContext(
-    client: Kord,
+    kord: Kord,
+    kfox: KFox,
+    translationModule: String,
     @Suppress("unused")
     val response: EphemeralMessageInteractionResponseBehavior,
     event: SelectMenuInteractionCreateEvent,
     registry: ComponentRegistry
-) : SelectMenuContext(client, event, registry)
+) : SelectMenuContext(kord, kfox, translationModule, event, registry)

@@ -1,4 +1,4 @@
-package dev.bitflow.kfox
+package dev.bitflow.kfox.data
 
 class MemoryComponentRegistry : ComponentRegistry {
     private val components = mutableMapOf<String, String>()

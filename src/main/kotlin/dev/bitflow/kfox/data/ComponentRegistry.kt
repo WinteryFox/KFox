@@ -1,4 +1,4 @@
-package dev.bitflow.kfox
+package dev.bitflow.kfox.data
 
 interface ComponentRegistry {
     suspend fun save(buttonId: String, callbackId: String)

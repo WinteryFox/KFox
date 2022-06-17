@@ -18,13 +18,15 @@ It will allow you to easily create and respond to any type of interaction that K
 ## Supported interactions
 
 - [x] Commands
+    - [x] Global
+    - [x] Guild
     - [x] Parameters
     - [x] Sub-commands
     - [x] Groups
     - [ ] User commands
     - [ ] Message commands
     - [ ] Autocomplete
-    - [ ] Localization
+    - [x] Localization
 - [x] Buttons
 - [x] Select menus
 - [x] Modals
@@ -61,10 +63,10 @@ suspend fun main() {
 #### Creating a command
 
 ```kotlin
-@Command("parrot", "I'm a friendly parakeet, I'll repeat what you said awk!") // 1
+@Command("parrot-desc", "I'm a friendly parakeet, I'll repeat what you said awk!") // 1
 suspend fun testCommand(
     context: PublicChatCommandContext, // 2
-    @Parameter("content", "content-key") // 3
+    @Parameter("content-desc", "content-key") // 3
     value: String
 ) = with(context) {
     response.createPublicFollowup {
