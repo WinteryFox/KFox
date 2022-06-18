@@ -72,5 +72,5 @@ class ResourceBundleTranslationProvider : TranslationProvider {
     override fun getAllStrings(key: String, module: String): Map<Locale, String> =
         modules[module]?.mapValues {
             getString(key, locale = it.key, module = module)
-        } ?: throw NullPointerException("Translation module not found \"$module\"")
+        } ?: throw NullPointerException("Translation module not found \"$module\" with key \"$key\"")
 }
