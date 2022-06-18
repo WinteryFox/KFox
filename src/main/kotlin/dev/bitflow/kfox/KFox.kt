@@ -7,7 +7,9 @@ import dev.bitflow.kfox.data.ModalComponentCallback
 import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.Choice
 import dev.kord.common.entity.Snowflake
+import dev.kord.common.entity.optional.Optional
 import dev.kord.core.Kord
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
@@ -414,6 +416,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                 function.parameters.map {
                     val p = it.findAnnotation<Parameter>()
                     val pModule = it.findAnnotation<Module>()?.module ?: module
+                    val choices = it.findAnnotation<Choices>()
 
                     ParameterData(
                         if (p == null) null else translationProvider.getString(
@@ -429,6 +432,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                         p?.nameKey,
                         p?.descriptionKey,
                         pModule,
+                        choices?.list?.map { choice -> Choice.StringChoice(choice, Optional(null), choice)}?.toMutableList(),
                         it
                     )
                 }.associateBy { it.parameter.name!! },
@@ -531,14 +535,21 @@ private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationP
             String::class -> string(name, description) {
                 localize(parameter.value)
                 required = !nullable
+                choices = parameter.value.choices
             }
 
-            User::class -> user(name, description) {
+            Number::class -> number(name, description) {
                 localize(parameter.value)
                 required = !nullable
             }
 
             Boolean::class -> boolean(name, description) {
+                localize(parameter.value)
+                required = !nullable
+            }
+
+
+            User::class -> user(name, description) {
                 localize(parameter.value)
                 required = !nullable
             }

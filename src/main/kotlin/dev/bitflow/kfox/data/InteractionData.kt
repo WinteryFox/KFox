@@ -1,5 +1,6 @@
 package dev.bitflow.kfox.data
 
+import dev.kord.common.entity.Choice
 import dev.kord.common.entity.Snowflake
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
@@ -10,6 +11,7 @@ data class ParameterData(
     val nameKey: String?,
     val descriptionKey: String?,
     val translationModule: String?,
+    val choices: MutableList<Choice<*>>?=null,
     val parameter: KParameter
 )
 

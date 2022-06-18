@@ -52,6 +52,7 @@ suspend fun sub(context: ChatCommandContext) = with(context) {
 suspend fun testCommand(
     context: ChatCommandContext,
     @Parameter("content-name", "content-desc")
+    @Choices(["mlem","i'm trying to do something useful"])
     value: String
 ) {
     with(context) {
