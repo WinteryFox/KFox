@@ -1,4 +1,4 @@
-package dev.bitflow.kfox.contexts
+package dev.bitflow.kfox.context
 
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
@@ -14,14 +14,14 @@ open class ChatCommandContext(
     @Suppress("unused")
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
-) : CommandContext(kord, kfox, translationModule, event, registry)
+) : CommandContext(kord, kfox, translationModule, event, null, registry)
 
 class PublicChatCommandContext(
     kord: Kord,
     kfox: KFox,
     translationModule: String,
     @Suppress("unused")
-    val response: PublicMessageInteractionResponseBehavior,
+    override val response: PublicMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
 ) : ChatCommandContext(kord, kfox, translationModule, event, registry)
@@ -31,7 +31,7 @@ class EphemeralChatCommandContext(
     kfox: KFox,
     translationModule: String,
     @Suppress("unused")
-    val response: EphemeralMessageInteractionResponseBehavior,
+    override val response: EphemeralMessageInteractionResponseBehavior,
     event: ChatInputCommandInteractionCreateEvent,
     registry: ComponentRegistry
 ) : ChatCommandContext(kord, kfox, translationModule, event, registry)

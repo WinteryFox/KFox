@@ -1,9 +1,21 @@
-package dev.bitflow.kfox.contexts
+package dev.bitflow.kfox.context
 
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
 import dev.kord.common.Locale
+import dev.kord.common.annotation.KordExperimental
+import dev.kord.common.annotation.KordUnsafe
+import dev.kord.common.entity.Permission
+import dev.kord.common.entity.Permissions
+import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
+import dev.kord.core.behavior.GuildBehavior
+import dev.kord.core.behavior.MemberBehavior
+import dev.kord.core.behavior.channel.asChannelOf
+import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
+import dev.kord.core.entity.channel.GuildChannel
+import dev.kord.core.entity.channel.TopGuildChannel
+import dev.kord.core.entity.channel.thread.ThreadChannel
 import dev.kord.core.event.interaction.ApplicationCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.core.event.interaction.InteractionCreateEvent
@@ -32,6 +44,7 @@ sealed class Context(
     val kfox: KFox,
     @Suppress("MemberVisibilityCanBePrivate") val translationModule: String,
     open val event: InteractionCreateEvent,
+    open val response: InteractionResponseBehavior?,
     private val registry: ComponentRegistry
 ) {
     @Suppress("unused")
@@ -73,6 +86,38 @@ sealed class Context(
             locale = event.interaction.guildLocale ?: kfox.translation.defaultLocale,
             module = module
         )
+
+    @OptIn(KordUnsafe::class, KordExperimental::class)
+    fun InteractionCreateEvent.guild(): GuildBehavior? =
+        interaction.data.guildId.value?.let { kord.unsafe.guild(it) }
+
+    @OptIn(KordUnsafe::class, KordExperimental::class)
+    fun InteractionCreateEvent.member(): MemberBehavior? =
+        interaction.data.member.value?.let { kord.unsafe.member(it.guildId, it.userId) }
+
+    suspend fun GuildChannel.permissionsForMember(memberId: Snowflake): Permissions = when (this) {
+        is TopGuildChannel -> getEffectivePermissions(memberId)
+        is ThreadChannel -> getParent().getEffectivePermissions(memberId)
+        else -> error("Unsupported channel type for channel: $this")
+    }
+
+    suspend fun checkPermissions(permissions: Set<Permission>) {
+        if (maskPermissions(permissions).isNotEmpty())
+            TODO("Because I am lazy, fuck you user, just kidding I love you <3. P.S. Feel free to PR this code for me <3")
+    }
+
+    suspend fun maskPermissions(permissions: Set<Permission>): Set<Permission> {
+        if (permissions.isEmpty())
+            return emptySet()
+
+        return if (event.guild() != null)
+            permissions.filter {
+                !event.interaction.getChannel().asChannelOf<GuildChannel>().permissionsForMember(kord.selfId)
+                    .contains(it)
+            }.toSet()
+        else
+            emptySet()
+    }
 }
 
 sealed class CommandContext(
@@ -80,16 +125,18 @@ sealed class CommandContext(
     kfox: KFox,
     translationModule: String,
     override val event: ApplicationCommandInteractionCreateEvent,
+    response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, registry)
+) : Context(kord, kfox, translationModule, event, response, registry)
 
 sealed class ComponentContext(
     kord: Kord,
     kfox: KFox,
     translationModule: String,
     override val event: ComponentInteractionCreateEvent,
+    response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, registry)
+) : Context(kord, kfox, translationModule, event, response, registry)
 
 open class ModalContext(
     kord: Kord,
@@ -97,5 +144,6 @@ open class ModalContext(
     translationModule: String,
     @Suppress("unused")
     override val event: ModalSubmitInteractionCreateEvent,
+    response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, registry)
+) : Context(kord, kfox, translationModule, event, response, registry)

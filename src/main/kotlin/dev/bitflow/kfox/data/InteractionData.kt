@@ -1,5 +1,6 @@
 package dev.bitflow.kfox.data
 
+import dev.bitflow.kfox.filter.Filter
 import dev.kord.common.entity.Choice
 import dev.kord.common.entity.Snowflake
 import kotlin.reflect.KFunction
@@ -11,7 +12,7 @@ data class ParameterData(
     val nameKey: String?,
     val descriptionKey: String?,
     val translationModule: String?,
-    val choices: MutableList<Choice<*>>?=null,
+    val choices: MutableList<Choice<*>>? = null,
     val parameter: KParameter
 )
 
@@ -23,6 +24,7 @@ data class CommandData(
     val translationModule: String,
     val function: KFunction<*>,
     val parameters: Map<String, ParameterData>,
+    val filters: Set<Filter>,
     val guild: Snowflake?,
     val group: GroupData?,
     val parent: String?,

@@ -1,6 +1,7 @@
 package dev.bitflow.kfox
 
-import dev.bitflow.kfox.contexts.*
+import dev.bitflow.kfox.context.*
+import dev.bitflow.kfox.filter.GuildFilter
 import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.entity.TextInputStyle
@@ -16,6 +17,7 @@ const val MODAL_CALLBACK = "modal"
 
 @Command("name", "description", guild = 809278232100077629L)
 @Module("help")
+@Filter(GuildFilter::class)
 suspend fun help(
     context: EphemeralChatCommandContext
 ) = with(context) {
@@ -87,7 +89,7 @@ class TestBot {
     fun testBot(): Unit = runBlocking {
         val translationProvider =
             ResourceBundleTranslationProvider("test", Locale.ENGLISH_UNITED_STATES)
-        val kfox = client.kfox("dev.bitflow.kfox", translationProvider)
+        val kfox = client.KFox("dev.bitflow.kfox", translationProvider)
         kfox.listen()
         client.login()
         return@runBlocking

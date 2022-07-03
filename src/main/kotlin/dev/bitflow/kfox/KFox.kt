@@ -1,9 +1,10 @@
 package dev.bitflow.kfox
 
-import dev.bitflow.kfox.contexts.*
+import dev.bitflow.kfox.context.*
 import dev.bitflow.kfox.data.*
 import dev.bitflow.kfox.data.ComponentCallback
 import dev.bitflow.kfox.data.ModalComponentCallback
+import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
@@ -36,7 +37,7 @@ import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.kotlinFunction
 
 class KFox(
-    reflections: Reflections,
+    `package`: String,
     val translation: TranslationProvider,
     private val registry: ComponentRegistry = MemoryComponentRegistry(),
     eventsFlow: (KFox) -> SharedFlow<Event>
@@ -50,6 +51,8 @@ class KFox(
     private val localComponentCallbacks: Map<String, ComponentCallback>
 
     init {
+        val reflections =
+            Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`))
         commands = scanForCommands(translation, reflections).associateBy { it.defaultName }
         localComponentCallbacks =
             reflections.getMethodsAnnotatedWith(Button::class.java).map { it.kotlinFunction!! }
@@ -195,14 +198,17 @@ class KFox(
                                         registry,
                                         this,
                                         suppliedParameters,
-                                        localCommand.parameters
+                                        localCommand.parameters,
+                                        localCommand.filters
                                     )
                                 }
 
                                 else -> TODO()
                             }
                         }
-                    }.onFailure { kordLogger.catching(it) }
+                    }.onFailure {
+                        kordLogger.catching(it)
+                    }
                 }
             }
             .onStart { logger.info { "Started listening for interactions." } }
@@ -218,7 +224,9 @@ class KFox(
         event: InteractionCreateEvent,
         suppliedParameters: Map<String, Any?>,
         commandParameters: Map<String, ParameterData> = emptyMap(),
+        filters: Set<dev.bitflow.kfox.filter.Filter> = emptySet()
     ) {
+        var context: Context? = null
         val parameters = parameters.associateWith { parameter ->
             val supplied = suppliedParameters
                 .entries
@@ -242,7 +250,7 @@ class KFox(
                 return@associateWith null
             }
 
-            when (parameter.type.classifier) {
+            context = when (parameter.type.classifier) {
                 ChatCommandContext::class ->
                     ChatCommandContext(
                         kord,
@@ -336,6 +344,7 @@ class KFox(
                         kfox,
                         translationModule,
                         event as ModalSubmitInteractionCreateEvent,
+                        null,
                         registry
                     )
 
@@ -361,7 +370,12 @@ class KFox(
 
                 else -> throw IllegalArgumentException("Failed to wire parameter \"${parameter.name}\".")
             }
+            context
         }
+        if (context != null)
+            for (filter in filters)
+                if (!filter.doFilter(context!!))
+                    return
         callSuspendBy(
             parameters
         )
@@ -397,6 +411,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val module = function.findAnnotation<Module>()?.module ?: translationProvider.defaultModule
             val subCommand = function.findAnnotation<SubCommand>()
             val group = function.findAnnotation<Group>()
+            val filters = function.findAnnotation<Filter>()
 
             CommandData(
                 translationProvider.getString(
@@ -432,10 +447,13 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                         p?.nameKey,
                         p?.descriptionKey,
                         pModule,
-                        choices?.list?.map { choice -> Choice.StringChoice(choice, Optional(null), choice)}?.toMutableList(),
+                        choices?.list?.map { choice -> Choice.StringChoice(choice, Optional(null), choice) }
+                            ?.toMutableList(),
                         it
                     )
                 }.associateBy { it.parameter.name!! },
+                filters?.filters?.mapNotNull { it.objectInstance as dev.bitflow.kfox.filter.Filter? }?.toSet()
+                    ?: emptySet(),
                 if (annotation.guild != Long.MIN_VALUE) Snowflake(annotation.guild) else null,
                 if (group == null) null else GroupData(
                     translationProvider.getString(
@@ -573,22 +591,31 @@ private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationP
     }
 }
 
-suspend fun Kord.kfox(
+suspend fun Kord.KFox(
     `package`: String,
     translationProvider: TranslationProvider,
-    registry: ComponentRegistry = MemoryComponentRegistry(),
+    componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
     registerCommands: Boolean = true
-): KFox = if (registerCommands) {
-    KFox(
-        Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)),
-        translationProvider,
-        registry
-    ) { events }.putCommands(this)
-} else {
-    KFox(
-        Reflections(ConfigurationBuilder().addScanners(Scanners.MethodsAnnotated).forPackage(`package`)),
-        translationProvider,
-        registry
-    ) { events }
+): KFox {
+    val kfox = KFox(`package`, { events }) {
+        this.translationProvider = translationProvider
+        this.componentRegistry = componentRegistry
+    }
+
+    if (registerCommands)
+        kfox.putCommands(this)
+
+    return kfox
 }
 
+fun KFox(`package`: String, events: (KFox) -> SharedFlow<Event>, init: KFoxBuilder.() -> Unit): KFox =
+    KFoxBuilder(`package`, events).apply(init).build()
+
+class KFoxBuilder internal constructor(var `package`: String, var events: (KFox) -> SharedFlow<Event>) {
+    var translationProvider: TranslationProvider =
+        ResourceBundleTranslationProvider("default", Locale.ENGLISH_UNITED_STATES)
+
+    var componentRegistry: ComponentRegistry = MemoryComponentRegistry()
+
+    fun build() = KFox(`package`, translationProvider, componentRegistry, events)
+}

@@ -1,5 +1,9 @@
 package dev.bitflow.kfox
 
+import dev.bitflow.kfox.filter.Filter
+import dev.bitflow.kfox.filter.GuildFilter
+import kotlin.reflect.KClass
+
 @Target(AnnotationTarget.FUNCTION)
 annotation class Module(
     val module: String
@@ -51,4 +55,9 @@ annotation class Modal(
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class ModalValue(
     val customId: String
+)
+
+@Target(AnnotationTarget.FUNCTION)
+annotation class Filter(
+    vararg val filters: KClass<*>
 )

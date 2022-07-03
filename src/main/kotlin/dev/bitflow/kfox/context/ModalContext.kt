@@ -1,4 +1,4 @@
-package dev.bitflow.kfox.contexts
+package dev.bitflow.kfox.context
 
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
@@ -12,17 +12,17 @@ class PublicModalContext(
     kfox: KFox,
     translationModule: String,
     @Suppress("unused")
-    val response: PublicMessageInteractionResponseBehavior,
+    override val response: PublicMessageInteractionResponseBehavior,
     event: ModalSubmitInteractionCreateEvent,
     registry: ComponentRegistry
-) : ModalContext(kord, kfox, translationModule, event, registry)
+) : ModalContext(kord, kfox, translationModule, event, response, registry)
 
 class EphemeralModalContext(
     kord: Kord,
     kfox: KFox,
     translationModule: String,
     @Suppress("unused")
-    val response: EphemeralMessageInteractionResponseBehavior,
+    override val response: EphemeralMessageInteractionResponseBehavior,
     event: ModalSubmitInteractionCreateEvent,
     registry: ComponentRegistry
-) : ModalContext(kord, kfox, translationModule, event, registry)
+) : ModalContext(kord, kfox, translationModule, event, response, registry)
