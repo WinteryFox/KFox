@@ -2,8 +2,6 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.context.*
 import dev.bitflow.kfox.data.*
-import dev.bitflow.kfox.data.ComponentCallback
-import dev.bitflow.kfox.data.ModalComponentCallback
 import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
@@ -22,9 +20,12 @@ import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
 import dev.kord.rest.builder.interaction.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import mu.KLogger
 import mu.KotlinLogging
 import org.reflections.Reflections
@@ -36,16 +37,17 @@ import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.jvm.kotlinFunction
 
-class KFox(
+class KFox<T, E : AsKordEvent<T>>(
     `package`: String,
     val translation: TranslationProvider,
     private val registry: ComponentRegistry = MemoryComponentRegistry(),
-    eventsFlow: (KFox) -> SharedFlow<Event>
+    eventsFlow: (KFox<T, E>) -> SharedFlow<T>,
+    private val mapper: E
 ) : CoroutineScope {
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Default
 
-    private val events: SharedFlow<Event> = eventsFlow(this)
+    private val events: SharedFlow<T> = eventsFlow(this)
     private val logger = KotlinLogging.logger {}
     private val commands: Map<String, CommandData>
     private val localComponentCallbacks: Map<String, ComponentCallback>
@@ -100,7 +102,7 @@ class KFox(
         logger.info { "KFox instance is ready!" }
     }
 
-    suspend fun putCommands(kord: Kord, snowflake: Snowflake? = null): KFox {
+    suspend fun putCommands(kord: Kord, snowflake: Snowflake? = null): KFox<T, E> {
         val globalCommands = commands.values.filter { it.guild == null }
         if (globalCommands.isNotEmpty())
             if (snowflake == null)
@@ -133,9 +135,11 @@ class KFox(
     @Suppress("unused")
     fun listen(): Job =
         events.buffer(Channel.UNLIMITED)
-            .filterIsInstance<InteractionCreateEvent>()
-            .onEach { logger.trace { "Received interaction ${it.interaction.id}" } }
-            .onEach { event ->
+            .map { it to mapper(it) }
+            .filter { it.second is InteractionCreateEvent }
+            .map { it.first to it.second as InteractionCreateEvent }
+            .onEach { logger.trace { "Received interaction ${it.second.interaction.id}" } }
+            .onEach { (source, event) ->
                 launch(event.coroutineContext) {
                     runCatching {
                         with(event) {
@@ -151,6 +155,7 @@ class KFox(
                                         this@KFox,
                                         callback.translationModule,
                                         registry,
+                                        source,
                                         this,
                                         interaction.textInputs
                                             .filterKeys { it in callback.params }
@@ -170,6 +175,7 @@ class KFox(
                                         this@KFox,
                                         callback.translationModule,
                                         registry,
+                                        source,
                                         this,
                                         emptyMap()
                                     )
@@ -196,6 +202,7 @@ class KFox(
                                         this@KFox,
                                         localCommand.translationModule,
                                         registry,
+                                        source,
                                         this,
                                         suppliedParameters,
                                         localCommand.parameters,
@@ -218,15 +225,16 @@ class KFox(
     @OptIn(KordUnsafe::class)
     private suspend fun KFunction<*>.callSuspendByParameters(
         kord: Kord,
-        kfox: KFox,
+        kfox: KFox<T, E>,
         translationModule: String,
         registry: ComponentRegistry,
+        source: T,
         event: InteractionCreateEvent,
         suppliedParameters: Map<String, Any?>,
         commandParameters: Map<String, ParameterData> = emptyMap(),
         filters: Set<dev.bitflow.kfox.filter.Filter> = emptySet()
     ) {
-        var context: Context? = null
+        var context: Context<T, E>? = null
         val parameters = parameters.associateWith { parameter ->
             val supplied = suppliedParameters
                 .entries
@@ -257,6 +265,7 @@ class KFox(
                         kfox,
                         translationModule,
                         event as ChatInputCommandInteractionCreateEvent,
+                        source,
                         registry
                     )
 
@@ -267,6 +276,7 @@ class KFox(
                         translationModule,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -277,6 +287,7 @@ class KFox(
                         translationModule,
                         (event as ChatInputCommandInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -286,6 +297,7 @@ class KFox(
                         kfox,
                         translationModule,
                         event as ButtonInteractionCreateEvent,
+                        source,
                         registry
                     )
 
@@ -296,6 +308,7 @@ class KFox(
                         translationModule,
                         (event as ButtonInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -306,6 +319,7 @@ class KFox(
                         translationModule,
                         (event as ButtonInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -315,6 +329,7 @@ class KFox(
                         kfox,
                         translationModule,
                         event as SelectMenuInteractionCreateEvent,
+                        source,
                         registry
                     )
 
@@ -325,6 +340,7 @@ class KFox(
                         translationModule,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -335,6 +351,7 @@ class KFox(
                         translationModule,
                         (event as SelectMenuInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -344,6 +361,7 @@ class KFox(
                         kfox,
                         translationModule,
                         event as ModalSubmitInteractionCreateEvent,
+                        source,
                         null,
                         registry
                     )
@@ -355,6 +373,7 @@ class KFox(
                         translationModule,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferPublicResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -365,6 +384,7 @@ class KFox(
                         translationModule,
                         (event as ModalSubmitInteractionCreateEvent).interaction.deferEphemeralResponseUnsafe(),
                         event,
+                        source,
                         registry
                     )
 
@@ -591,16 +611,16 @@ private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationP
     }
 }
 
-suspend fun Kord.KFox(
+suspend inline fun Kord.KFox(
     `package`: String,
     translationProvider: TranslationProvider,
     componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
-    registerCommands: Boolean = true
-): KFox {
-    val kfox = KFox(`package`, { events }) {
+    registerCommands: Boolean = true,
+): KFox<Event, AsKordEvent<Event>> {
+    val kfox = KFox<Event, AsKordEvent<Event>>(`package`, { events }, {
         this.translationProvider = translationProvider
         this.componentRegistry = componentRegistry
-    }
+    }, { it })
 
     if (registerCommands)
         kfox.putCommands(this)
@@ -608,14 +628,25 @@ suspend fun Kord.KFox(
     return kfox
 }
 
-fun KFox(`package`: String, events: (KFox) -> SharedFlow<Event>, init: KFoxBuilder.() -> Unit): KFox =
-    KFoxBuilder(`package`, events).apply(init).build()
+fun <T, E : AsKordEvent<T>> KFox(
+    `package`: String,
+    events: (KFox<T, E>) -> SharedFlow<T>,
+    init: KFoxBuilder<T, E>.() -> Unit,
+    mapper: E
+): KFox<T, E> =
+    KFoxBuilder(`package`, events, mapper).apply(init).build()
 
-class KFoxBuilder internal constructor(var `package`: String, var events: (KFox) -> SharedFlow<Event>) {
+class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor(
+    var `package`: String,
+    var events: (KFox<T, E>) -> SharedFlow<T>,
+    var mapper: E
+) {
     var translationProvider: TranslationProvider =
         ResourceBundleTranslationProvider("default", Locale.ENGLISH_UNITED_STATES)
 
     var componentRegistry: ComponentRegistry = MemoryComponentRegistry()
 
-    fun build() = KFox(`package`, translationProvider, componentRegistry, events)
+    fun build() = KFox(`package`, translationProvider, componentRegistry, events, mapper)
 }
+
+typealias AsKordEvent<T> = ((T) -> Event)
