@@ -136,6 +136,7 @@ class KFox<T, E : AsKordEvent<T>>(
     fun listen(): Job =
         events.buffer(Channel.UNLIMITED)
             .map { it to mapper(it) }
+            .filter { it.second != null }
             .filter { it.second is InteractionCreateEvent }
             .map { it.first to it.second as InteractionCreateEvent }
             .onEach { logger.trace { "Received interaction ${it.second.interaction.id}" } }
@@ -234,7 +235,7 @@ class KFox<T, E : AsKordEvent<T>>(
         commandParameters: Map<String, ParameterData> = emptyMap(),
         filters: Set<dev.bitflow.kfox.filter.Filter> = emptySet()
     ) {
-        var context: Context<T, E>? = null
+        var context: Context<T>? = null
         val parameters = parameters.associateWith { parameter ->
             val supplied = suppliedParameters
                 .entries
@@ -649,4 +650,4 @@ class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor(
     fun build() = KFox(`package`, translationProvider, componentRegistry, events, mapper)
 }
 
-typealias AsKordEvent<T> = ((T) -> Event)
+typealias AsKordEvent<T> = suspend ((T) -> Event?)
