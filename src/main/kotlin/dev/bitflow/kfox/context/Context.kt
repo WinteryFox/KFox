@@ -1,6 +1,5 @@
 package dev.bitflow.kfox.context
 
-import dev.bitflow.kfox.AsKordEvent
 import dev.bitflow.kfox.KFox
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.kord.common.Locale
@@ -40,9 +39,9 @@ suspend inline fun ModalBuilder.register(registry: ComponentRegistry, callbackId
     registry.save(customId, callbackId)
 }
 
-sealed class Context<T, E : AsKordEvent<T>>(
+sealed class Context<T>(
     val kord: Kord,
-    val kfox: KFox<T, E>,
+    val kfox: KFox<T, *>,
     @Suppress("MemberVisibilityCanBePrivate") val translationModule: String,
     open val event: InteractionCreateEvent,
     open val source: T,
@@ -122,33 +121,33 @@ sealed class Context<T, E : AsKordEvent<T>>(
     }
 }
 
-sealed class CommandContext<T, E : AsKordEvent<T>>(
+sealed class CommandContext<T>(
     kord: Kord,
-    kfox: KFox<T, E>,
+    kfox: KFox<T, *>,
     translationModule: String,
     override val event: ApplicationCommandInteractionCreateEvent,
     override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context<T, E>(kord, kfox, translationModule, event, source, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)
 
-sealed class ComponentContext<T, E : AsKordEvent<T>>(
+sealed class ComponentContext<T>(
     kord: Kord,
-    kfox: KFox<T, E>,
+    kfox: KFox<T, *>,
     translationModule: String,
     override val event: ComponentInteractionCreateEvent,
     override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context<T, E>(kord, kfox, translationModule, event, source, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)
 
-open class ModalContext<T, E : AsKordEvent<T>>(
+open class ModalContext<T>(
     kord: Kord,
-    kfox: KFox<T, E>,
+    kfox: KFox<T, *>,
     translationModule: String,
     @Suppress("unused")
     override val event: ModalSubmitInteractionCreateEvent,
     override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context<T, E>(kord, kfox, translationModule, event, source, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)
