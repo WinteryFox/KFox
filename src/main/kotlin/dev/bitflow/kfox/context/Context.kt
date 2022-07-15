@@ -3,8 +3,8 @@ package dev.bitflow.kfox.context
 import dev.bitflow.kfox.InsufficientPermissionsException
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
-import dev.bitflow.kfox.KFoxException
 import dev.kord.common.Locale
+import dev.bitflow.kfox.KFoxException
 import dev.kord.common.annotation.KordExperimental
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Permission
@@ -45,11 +45,12 @@ suspend inline fun ModalBuilder.register(registry: ComponentRegistry, callbackId
     registry.save(customId, callbackId)
 }
 
-sealed class Context(
+sealed class Context<T>(
     val kord: Kord,
-    val kfox: KFox,
+    val kfox: KFox<T, *>,
     @Suppress("MemberVisibilityCanBePrivate") val translationModule: String,
     open val event: InteractionCreateEvent,
+    open val source: T,
     open val response: InteractionResponseBehavior?,
     private val registry: ComponentRegistry
 ) {
@@ -131,30 +132,33 @@ sealed class Context(
     }
 }
 
-sealed class CommandContext(
+sealed class CommandContext<T>(
     kord: Kord,
-    kfox: KFox,
+    kfox: KFox<T, *>,
     translationModule: String,
     override val event: ApplicationCommandInteractionCreateEvent,
+    override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)
 
-sealed class ComponentContext(
+sealed class ComponentContext<T>(
     kord: Kord,
-    kfox: KFox,
+    kfox: KFox<T, *>,
     translationModule: String,
     override val event: ComponentInteractionCreateEvent,
+    override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)
 
-open class ModalContext(
+open class ModalContext<T>(
     kord: Kord,
-    kfox: KFox,
+    kfox: KFox<T, *>,
     translationModule: String,
     @Suppress("unused")
     override val event: ModalSubmitInteractionCreateEvent,
+    override val source: T,
     response: InteractionResponseBehavior?,
     registry: ComponentRegistry
-) : Context(kord, kfox, translationModule, event, response, registry)
+) : Context<T>(kord, kfox, translationModule, event, source, response, registry)

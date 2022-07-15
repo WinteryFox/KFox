@@ -62,8 +62,42 @@ val sourceJar = task("sourceJar", Jar::class) {
 }
 
 publishing {
+
+    repositories {
+        maven {
+            url = if (project.version.toString().contains("SNAPSHOT")) {
+                uri("https://nexus.zerotwo.bot/repository/m2-public-snapshots/")
+            } else {
+                uri("https://nexus.zerotwo.bot/repository/m2-public-releases/")
+            }
+            credentials {
+                username = System.getenv("NEXUS_USER")
+                password = System.getenv("NEXUS_PASSWORD")
+            }
+        }
+    }
+
     publications {
         create<MavenPublication>("maven") {
+            pom {
+                name.set("KFox")
+                description.set("A discord command library in kotlin")
+                url.set("https://github.com/ZeroTwo-Bot/KFox/")
+
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com:ZeroTwo-Bot/KFox.git")
+                    developerConnection.set("scm:git:ssh://github.com:ZeroTwo-Bot/KFox.git")
+                    url.set("https://github.com/ZeroTwo-Bot/KFox/")
+                }
+            }
+
             from(components.getByName("java"))
 
             artifact(sourceJar)

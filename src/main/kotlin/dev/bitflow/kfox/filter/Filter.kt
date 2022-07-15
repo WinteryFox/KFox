@@ -1,7 +1,7 @@
 package dev.bitflow.kfox.filter
 
-import dev.bitflow.kfox.context.*
+import dev.bitflow.kfox.context.Context
 
 interface Filter {
-    suspend fun doFilter(context: Context): Boolean
+    suspend fun <T> doFilter(context: Context<T>): Boolean
 }
