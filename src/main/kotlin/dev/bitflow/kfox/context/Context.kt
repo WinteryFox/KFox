@@ -1,7 +1,9 @@
 package dev.bitflow.kfox.context
 
+import dev.bitflow.kfox.InsufficientPermissionsException
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
+import dev.bitflow.kfox.KFoxException
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordExperimental
 import dev.kord.common.annotation.KordUnsafe
@@ -13,6 +15,8 @@ import dev.kord.core.behavior.GuildBehavior
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.channel.asChannelOf
 import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
+import dev.kord.core.entity.Member
+import dev.kord.core.entity.Role
 import dev.kord.core.entity.channel.GuildChannel
 import dev.kord.core.entity.channel.TopGuildChannel
 import dev.kord.core.entity.channel.thread.ThreadChannel
@@ -20,9 +24,11 @@ import dev.kord.core.event.interaction.ApplicationCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.core.event.interaction.InteractionCreateEvent
 import dev.kord.core.event.interaction.ModalSubmitInteractionCreateEvent
+import dev.kord.core.sorted
 import dev.kord.rest.builder.component.ButtonBuilder
 import dev.kord.rest.builder.component.SelectMenuBuilder
 import dev.kord.rest.builder.interaction.ModalBuilder
+import kotlinx.coroutines.flow.toList
 
 @Suppress("unused")
 suspend inline fun ButtonBuilder.InteractionButtonBuilder.register(registry: ComponentRegistry, callbackId: String) {
@@ -101,9 +107,14 @@ sealed class Context(
         else -> error("Unsupported channel type for channel: $this")
     }
 
-    suspend fun checkPermissions(permissions: Set<Permission>) {
-        if (maskPermissions(permissions).isNotEmpty())
-            TODO("Because I am lazy, fuck you user, just kidding I love you <3. P.S. Feel free to PR this code for me <3")
+    suspend fun Member.topRole(): Role? = roles.toList().maxByOrNull { it.getPosition() }
+
+    suspend inline fun checkPermissions(vararg permissions: Permission) = checkPermissions(permissions.toSet())
+
+    suspend inline fun checkPermissions(permissions: Set<Permission>) {
+        val p = maskPermissions(permissions)
+        if (p.isNotEmpty())
+            throw InsufficientPermissionsException(p)
     }
 
     suspend fun maskPermissions(permissions: Set<Permission>): Set<Permission> {

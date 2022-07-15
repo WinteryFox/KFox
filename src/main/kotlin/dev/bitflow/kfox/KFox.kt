@@ -207,7 +207,8 @@ class KFox(
                             }
                         }
                     }.onFailure {
-                        kordLogger.catching(it)
+                        if (it !is KFoxException)
+                            kordLogger.catching(it)
                     }
                 }
             }
@@ -597,7 +598,10 @@ suspend fun Kord.KFox(
     componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
     registerCommands: Boolean = true
 ): KFox {
-    val kfox = KFox(`package`, { events }) {
+    val e = events
+    val kfox = KFox {
+        this.`package` = `package`
+        this.events = { e }
         this.translationProvider = translationProvider
         this.componentRegistry = componentRegistry
     }
@@ -608,10 +612,14 @@ suspend fun Kord.KFox(
     return kfox
 }
 
-fun KFox(`package`: String, events: (KFox) -> SharedFlow<Event>, init: KFoxBuilder.() -> Unit): KFox =
-    KFoxBuilder(`package`, events).apply(init).build()
+fun KFox(init: KFoxBuilder.() -> Unit): KFox =
+    KFoxBuilder().apply(init).build()
 
-class KFoxBuilder internal constructor(var `package`: String, var events: (KFox) -> SharedFlow<Event>) {
+class KFoxBuilder internal constructor() {
+    lateinit var `package`: String
+
+    lateinit var events: (KFox) -> SharedFlow<Event>
+
     var translationProvider: TranslationProvider =
         ResourceBundleTranslationProvider("default", Locale.ENGLISH_UNITED_STATES)
 
