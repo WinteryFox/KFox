@@ -215,7 +215,8 @@ class KFox<T, E : AsKordEvent<T>>(
                             }
                         }
                     }.onFailure {
-                        kordLogger.catching(it)
+                        if (it !is KFoxException)
+                            kordLogger.catching(it)
                     }
                 }
             }
@@ -616,12 +617,16 @@ suspend inline fun Kord.KFox(
     `package`: String,
     translationProvider: TranslationProvider,
     componentRegistry: ComponentRegistry = MemoryComponentRegistry(),
-    registerCommands: Boolean = true,
+    registerCommands: Boolean = true
 ): KFox<Event, AsKordEvent<Event>> {
-    val kfox = KFox<Event, AsKordEvent<Event>>(`package`, { events }, {
+    val e = events
+    val kfox = KFox<Event, AsKordEvent<Event>> {
+        this.`package` = `package`
+        this.events = { e }
+        this.mapper = { it }
         this.translationProvider = translationProvider
         this.componentRegistry = componentRegistry
-    }, { it })
+    }
 
     if (registerCommands)
         kfox.putCommands(this)
@@ -629,19 +634,15 @@ suspend inline fun Kord.KFox(
     return kfox
 }
 
-fun <T, E : AsKordEvent<T>> KFox(
-    `package`: String,
-    events: (KFox<T, E>) -> SharedFlow<T>,
-    init: KFoxBuilder<T, E>.() -> Unit,
-    mapper: E
-): KFox<T, E> =
-    KFoxBuilder(`package`, events, mapper).apply(init).build()
+fun <T, E : AsKordEvent<T>> KFox(init: KFoxBuilder<T, E>.() -> Unit): KFox<T, E> =
+    KFoxBuilder<T, E>().apply(init).build()
 
-class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor(
-    var `package`: String,
-    var events: (KFox<T, E>) -> SharedFlow<T>,
-    var mapper: E
-) {
+class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor() {
+    lateinit var `package`: String
+
+    lateinit var events: (KFox<T, E>) -> SharedFlow<T>
+    lateinit var mapper: E
+
     var translationProvider: TranslationProvider =
         ResourceBundleTranslationProvider("default", Locale.ENGLISH_UNITED_STATES)
 
