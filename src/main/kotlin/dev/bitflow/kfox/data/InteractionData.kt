@@ -2,6 +2,7 @@ package dev.bitflow.kfox.data
 
 import dev.bitflow.kfox.filter.Filter
 import dev.kord.common.entity.Choice
+import dev.kord.common.entity.Permissions
 import dev.kord.common.entity.Snowflake
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
@@ -28,7 +29,8 @@ data class CommandData(
     val guild: Snowflake?,
     val group: GroupData?,
     val parent: String?,
-    val children: List<CommandData>
+    val children: List<CommandData>,
+    val permissions: Permissions?
 )
 
 data class GroupData(

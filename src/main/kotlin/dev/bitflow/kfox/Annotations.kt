@@ -2,6 +2,8 @@ package dev.bitflow.kfox
 
 import dev.bitflow.kfox.filter.Filter
 import dev.bitflow.kfox.filter.GuildFilter
+import dev.kord.common.entity.Permission
+import dev.kord.common.entity.Permissions
 import kotlin.reflect.KClass
 
 @Target(AnnotationTarget.FUNCTION)

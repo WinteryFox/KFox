@@ -14,6 +14,7 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.GuildBehavior
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.channel.asChannelOf
+import dev.kord.core.behavior.interaction.respondEphemeral
 import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
 import dev.kord.core.entity.Member
 import dev.kord.core.entity.Role
@@ -114,8 +115,16 @@ sealed class Context<T>(
 
     suspend inline fun checkPermissions(permissions: Set<Permission>) {
         val p = maskPermissions(permissions)
-        if (p.isNotEmpty())
+        if (p.isNotEmpty()) {
+            when (this) {
+                is ChatCommandContext<*> -> event.interaction.respondEphemeral {
+                    content = "I'm missing some permissions to do that! (${permissions.joinToString()})" // TODO: Localize
+                }
+
+                else -> TODO()
+            }
             throw InsufficientPermissionsException(p)
+        }
     }
 
     suspend fun maskPermissions(permissions: Set<Permission>): Set<Permission> {

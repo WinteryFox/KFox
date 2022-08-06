@@ -7,6 +7,8 @@ import dev.bitflow.kfox.localization.TranslationProvider
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Choice
+import dev.kord.common.entity.Permission
+import dev.kord.common.entity.Permissions
 import dev.kord.common.entity.Snowflake
 import dev.kord.common.entity.optional.Optional
 import dev.kord.core.Kord
@@ -500,7 +502,8 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     locale = translationProvider.defaultLocale,
                     module = module
                 ),
-                emptyList()
+                emptyList(),
+                Permissions()
             )
         }
 
@@ -548,6 +551,8 @@ private fun MultiApplicationCommandBuilder.registerCommands(
             }
 
             addParameters(translationProvider, command)
+
+            defaultMemberPermissions = command.permissions
         }
     }
 }
