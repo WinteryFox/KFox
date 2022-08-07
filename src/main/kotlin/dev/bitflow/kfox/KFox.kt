@@ -438,15 +438,19 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val group = function.findAnnotation<Group>()
             val filters = function.findAnnotation<Filter>()
 
-            val defaultPermission = function.annotations
+            val permissionAnnotations =  function.annotations
                 .mapNotNull { it.annotationClass.findAnnotation<DefaultPermission>() }
-                .firstOrNull()
-                ?.let {
-                    Permissions {
-                        // So yeah, this is a massive hack, but Kord doesn't really give us a better option.
+
+            val defaultPermission = if (permissionAnnotations.isEmpty()) {
+                null
+            } else {
+                Permissions {
+                    // So yeah, this is a massive hack, but Kord doesn't really give us a better option.
+                    permissionAnnotations.forEach {
                         + Permission.Unknown(DiscordBitSet(it.permission))
                     }
                 }
+            }
 
             CommandData(
                 translationProvider.getString(
