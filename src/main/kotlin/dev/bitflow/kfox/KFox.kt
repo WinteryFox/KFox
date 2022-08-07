@@ -4,7 +4,6 @@ import dev.bitflow.kfox.context.*
 import dev.bitflow.kfox.data.*
 import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.bitflow.kfox.localization.TranslationProvider
-import dev.kord.common.DiscordBitSet
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Choice
@@ -444,12 +443,11 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val defaultPermission = if (permissionAnnotations.isEmpty()) {
                 null
             } else {
-                Permissions {
-                    // So yeah, this is a massive hack, but Kord doesn't really give us a better option.
-                    permissionAnnotations.forEach {
-                        + Permission.Unknown(DiscordBitSet(it.permission))
+                Permissions(
+                    permissionAnnotations.map {
+                        Permission.Unknown(it.permission)
                     }
-                }
+                )
             }
 
             CommandData(
