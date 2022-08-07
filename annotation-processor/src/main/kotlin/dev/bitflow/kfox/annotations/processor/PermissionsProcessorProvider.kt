@@ -6,6 +6,6 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import dev.bitflow.kfox.annotations.processor.permissions.PermissionsProcessor
 
 class PermissionsProcessorProvider : SymbolProcessorProvider {
-	override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
-		PermissionsProcessor(environment.codeGenerator, environment.logger)
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
+        PermissionsProcessor(environment.codeGenerator, environment.logger)
 }
