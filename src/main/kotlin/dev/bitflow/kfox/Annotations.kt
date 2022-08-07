@@ -1,9 +1,6 @@
 package dev.bitflow.kfox
 
-import dev.bitflow.kfox.filter.Filter
-import dev.bitflow.kfox.filter.GuildFilter
-import dev.kord.common.entity.Permission
-import dev.kord.common.entity.Permissions
+import dev.bitflow.kfox.annotations.GenerateForPermissions
 import kotlin.reflect.KClass
 
 @Target(AnnotationTarget.FUNCTION)
@@ -62,4 +59,10 @@ annotation class ModalValue(
 @Target(AnnotationTarget.FUNCTION)
 annotation class Filter(
     vararg val filters: KClass<*>
+)
+
+@GenerateForPermissions
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+annotation class DefaultPermission(
+    val permission: Long
 )

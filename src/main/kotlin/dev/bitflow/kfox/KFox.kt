@@ -437,6 +437,19 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val group = function.findAnnotation<Group>()
             val filters = function.findAnnotation<Filter>()
 
+            val permissionAnnotations = function.annotations
+                .mapNotNull { it.annotationClass.findAnnotation<DefaultPermission>() }
+
+            val defaultPermission = if (permissionAnnotations.isEmpty()) {
+                null
+            } else {
+                Permissions(
+                    permissionAnnotations.map {
+                        Permission.Unknown(it.permission)
+                    }
+                )
+            }
+
             CommandData(
                 translationProvider.getString(
                     annotation.nameKey,
@@ -503,7 +516,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     module = module
                 ),
                 emptyList(),
-                Permissions()
+                defaultPermission
             )
         }
 
