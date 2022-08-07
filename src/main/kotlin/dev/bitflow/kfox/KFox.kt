@@ -4,6 +4,7 @@ import dev.bitflow.kfox.context.*
 import dev.bitflow.kfox.data.*
 import dev.bitflow.kfox.localization.ResourceBundleTranslationProvider
 import dev.bitflow.kfox.localization.TranslationProvider
+import dev.kord.common.DiscordBitSet
 import dev.kord.common.Locale
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Choice
@@ -437,6 +438,16 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
             val group = function.findAnnotation<Group>()
             val filters = function.findAnnotation<Filter>()
 
+            val defaultPermission = function.annotations
+                .mapNotNull { it.annotationClass.findAnnotation<DefaultPermission>() }
+                .firstOrNull()
+                ?.let {
+                    Permissions {
+                        // So yeah, this is a massive hack, but Kord doesn't really give us a better option.
+                        + Permission.Unknown(DiscordBitSet(it.permission))
+                    }
+                }
+
             CommandData(
                 translationProvider.getString(
                     annotation.nameKey,
@@ -503,7 +514,7 @@ fun scanForCommands(translationProvider: TranslationProvider, reflections: Refle
                     module = module
                 ),
                 emptyList(),
-                Permissions()
+                defaultPermission
             )
         }
 

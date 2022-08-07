@@ -6,7 +6,9 @@ val kordVersion = "0.8.0-M15"
 plugins {
     kotlin("jvm") version "1.7.10"
     kotlin("plugin.serialization") version "1.7.10"
+
     id("maven-publish")
+    id("com.google.devtools.ksp") version "1.7.10-1.0.6"
 }
 
 group = "dev.bitflow"
@@ -19,21 +21,25 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation(project(":annotations"))
+
+    ksp(project(":annotation-processor"))
+
     api("org.reflections:reflections:0.10.2")
+    api("com.ibm.icu:icu4j:71.1")
+    api("dev.kord:kord-core:$kordVersion")
+
     implementation("org.jetbrains.kotlin:kotlin-reflect:1.7.10")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.3")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.6.4")
-    api("com.ibm.icu:icu4j:71.1")
 
     implementation("io.github.microutils:kotlin-logging-jvm:2.1.23")
     runtimeOnly("org.slf4j:slf4j-api:1.7.36")
     runtimeOnly("ch.qos.logback:logback-classic:1.2.11")
     runtimeOnly("ch.qos.logback:logback-core:1.2.11")
-
-    api("dev.kord:kord-core:$kordVersion")
 
     testImplementation(kotlin("test"))
     testImplementation(platform("org.junit:junit-bom:5.8.2"))
@@ -61,7 +67,6 @@ val sourceJar = task("sourceJar", Jar::class) {
 }
 
 publishing {
-
     repositories {
         maven {
             url = if (project.version.toString().contains("SNAPSHOT")) {
