@@ -661,8 +661,7 @@ class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor() {
     lateinit var events: (KFox<T, E>) -> SharedFlow<T>
     lateinit var mapper: E
 
-    var translationProvider: TranslationProvider =
-        ResourceBundleTranslationProvider("default", Locale.ENGLISH_UNITED_STATES)
+    var translationProvider: TranslationProvider = ResourceBundleTranslationProvider()
 
     var componentRegistry: ComponentRegistry = MemoryComponentRegistry()
 

@@ -3,8 +3,8 @@ package dev.bitflow.kfox.context
 import dev.bitflow.kfox.InsufficientPermissionsException
 import dev.bitflow.kfox.data.ComponentRegistry
 import dev.bitflow.kfox.KFox
+import dev.bitflow.kfox.data.getPermissionName
 import dev.kord.common.Locale
-import dev.bitflow.kfox.KFoxException
 import dev.kord.common.annotation.KordExperimental
 import dev.kord.common.annotation.KordUnsafe
 import dev.kord.common.entity.Permission
@@ -16,6 +16,8 @@ import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.channel.asChannelOf
 import dev.kord.core.behavior.interaction.respondEphemeral
 import dev.kord.core.behavior.interaction.response.InteractionResponseBehavior
+import dev.kord.core.behavior.interaction.response.createEphemeralFollowup
+import dev.kord.core.behavior.interaction.response.createPublicFollowup
 import dev.kord.core.entity.Member
 import dev.kord.core.entity.Role
 import dev.kord.core.entity.channel.GuildChannel
@@ -25,7 +27,6 @@ import dev.kord.core.event.interaction.ApplicationCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.core.event.interaction.InteractionCreateEvent
 import dev.kord.core.event.interaction.ModalSubmitInteractionCreateEvent
-import dev.kord.core.sorted
 import dev.kord.rest.builder.component.ButtonBuilder
 import dev.kord.rest.builder.component.SelectMenuBuilder
 import dev.kord.rest.builder.interaction.ModalBuilder
@@ -116,12 +117,27 @@ sealed class Context<T>(
     suspend inline fun checkPermissions(permissions: Set<Permission>) {
         val p = maskPermissions(permissions)
         if (p.isNotEmpty()) {
-            when (this) {
-                is ChatCommandContext<*> -> event.interaction.respondEphemeral {
-                    content = "I'm missing some permissions to do that! (${permissions.joinToString()})" // TODO: Localize
-                }
+            val permissionNames = p.map {
+                kfox.translation.getPermissionName(
+                    it,
+                    event.interaction.locale ?: event.interaction.guildLocale ?: kfox.translation.defaultLocale
+                )
+            }
 
-                else -> TODO()
+            val c = "I'm missing some permissions to do that! (${permissionNames.joinToString()})" // TODO: Localize
+            when (this) {
+                is PublicChatCommandContext -> response.createPublicFollowup { content = c }
+                is PublicModalContext -> response.createPublicFollowup { content = c }
+                is PublicButtonContext -> response.createPublicFollowup { content = c }
+                is PublicSelectMenuContext -> response.createPublicFollowup { content = c }
+                is EphemeralChatCommandContext -> response.createEphemeralFollowup { content = c }
+                is EphemeralModalContext -> response.createEphemeralFollowup { content = c }
+                is EphemeralButtonContext -> response.createEphemeralFollowup { content = c }
+                is EphemeralSelectMenuContext -> response.createEphemeralFollowup { content = c }
+                is ChatCommandContext -> event.interaction.respondEphemeral { content = c }
+                is ButtonContext -> event.interaction.respondEphemeral { content = c }
+                is SelectMenuContext -> event.interaction.respondEphemeral { content = c }
+                is ModalContext -> event.interaction.respondEphemeral { content = c }
             }
             throw InsufficientPermissionsException(p)
         }
