@@ -17,6 +17,7 @@ repositories {
 }
 
 dependencies {
+    implementation(kotlin("reflect"))
     implementation(kotlin("stdlib"))
 
     implementation("com.google.devtools.ksp:symbol-processing-api:1.7.10-1.0.6")
