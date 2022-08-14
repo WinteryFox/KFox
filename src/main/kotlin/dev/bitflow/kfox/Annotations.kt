@@ -1,5 +1,6 @@
 package dev.bitflow.kfox
 
+import dev.bitflow.kfox.annotations.GenerateForChannelTypes
 import dev.bitflow.kfox.annotations.GenerateForPermissions
 import kotlin.reflect.KClass
 
@@ -63,6 +64,30 @@ annotation class Filter(
 
 @GenerateForPermissions
 @Target(AnnotationTarget.ANNOTATION_CLASS)
-annotation class DefaultPermission(
+internal annotation class DefaultPermission(
     val permission: Long
+)
+
+@GenerateForChannelTypes
+@Target(AnnotationTarget.ANNOTATION_CLASS)
+internal annotation class ChannelType(
+    val channelType: Int
+)
+
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class LongOptions(
+    val min: Long = Long.MIN_VALUE,
+    val max: Long = Long.MAX_VALUE
+)
+
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class DoubleOptions(
+    val min: Double = Double.MIN_VALUE,
+    val max: Double = Double.MAX_VALUE
+)
+
+@Target(AnnotationTarget.VALUE_PARAMETER)
+annotation class StringOptions(
+    val minLength: Int = Int.MIN_VALUE,
+    val maxLength: Int = Int.MAX_VALUE
 )

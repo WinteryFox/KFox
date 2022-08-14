@@ -37,7 +37,10 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.findAnnotations
 import kotlin.reflect.jvm.kotlinFunction
+import dev.kord.common.entity.ChannelType as KordChannelType
+import dev.kord.core.entity.channel.Channel as KordChannel
 
 class KFox<T, E : AsKordEvent<T>>(
     `package`: String,
@@ -590,42 +593,95 @@ private fun BaseInputChatBuilder.addParameters(translationProvider: TranslationP
 
         val nullable = parameter.value.parameter.type.isMarkedNullable
         when (parameter.value.parameter.type.classifier) {
-            String::class -> string(name, description) {
-                localize(parameter.value)
-                required = !nullable
-                choices = parameter.value.choices
-            }
-
-            Number::class -> number(name, description) {
-                localize(parameter.value)
-                required = !nullable
-            }
+            Attachment::class -> attachment(name, description) { required = !nullable }
 
             Boolean::class -> boolean(name, description) {
                 localize(parameter.value)
+
                 required = !nullable
             }
 
-
-            User::class -> user(name, description) {
+            Double::class -> number(name, description) {
                 localize(parameter.value)
                 required = !nullable
+
+                val options = parameter.value.parameter.findAnnotations<DoubleOptions>().firstOrNull()
+
+                if (options != null) {
+                    if (options.max < Double.MAX_VALUE) {
+                        maxValue = options.max
+                    }
+
+                    if (options.min > Double.MIN_VALUE) {
+                        minValue = options.min
+                    }
+                }
             }
 
-            Role::class -> role(name, description) {
-                localize(parameter.value)
-                required = !nullable
-            }
-
-            dev.kord.core.entity.channel.Channel::class -> channel(
+            KordChannel::class -> channel(
                 name,
                 description
             ) {
                 localize(parameter.value)
+
+                required = !nullable
+
+                val options = parameter.value.parameter.findAnnotations<ChannelType>()
+
+                if (options.isNotEmpty()) {
+                    channelTypes = options.map { KordChannelType.Unknown(it.channelType) }
+                }
+            }
+
+            Long::class -> int(name, description) {
+                localize(parameter.value)
+
+                required = !nullable
+
+                val options = parameter.value.parameter.findAnnotations<LongOptions>().firstOrNull()
+
+                if (options != null) {
+                    if (options.max < Double.MAX_VALUE) {
+                        maxValue = options.max
+                    }
+
+                    if (options.min > Double.MIN_VALUE) {
+                        minValue = options.min
+                    }
+                }
+            }
+
+            Role::class -> role(name, description) {
+                localize(parameter.value)
+
                 required = !nullable
             }
 
-            Attachment::class -> attachment(name, description) { required = !nullable }
+            String::class -> string(name, description) {
+                localize(parameter.value)
+
+                required = !nullable
+                choices = parameter.value.choices
+
+                val options = parameter.value.parameter.findAnnotations<StringOptions>().firstOrNull()
+
+                if (options != null) {
+                    if (options.maxLength < Int.MAX_VALUE) {
+                        maxLength = options.maxLength
+                    }
+
+                    if (options.minLength > Int.MIN_VALUE) {
+                        minLength = options.minLength
+                    }
+                }
+            }
+
+            User::class -> user(name, description) {
+                localize(parameter.value)
+
+                required = !nullable
+            }
+
             else -> throw UnsupportedOperationException("Parameter of type ${parameter.value.parameter.type} is not supported.")
         }
     }

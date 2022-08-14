@@ -14,7 +14,7 @@ private const val ANNOTATION = "dev.bitflow.kfox.annotations.GenerateForPermissi
  * can have, allowing them to be set easily via a single annotation in your code.
  *
  * You really only ever want this to be run once per project, but there's nothing stopping you from using the
- * GenerateForPermissions annotation, if you want that for some reason.
+ * GenerateForPermissions annotation twice, if you want that for some reason.
  *
  * The annotated annotation class must take exactly one parameter - a [Long] representing the permission bitfield
  * number. It could probably be an [Integer], but `DiscordBitSet` uses [Long]s, so we're using them here too.
