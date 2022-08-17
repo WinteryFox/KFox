@@ -21,11 +21,13 @@ class ResourceBundleTranslationProvider(
         }
 
     override fun supportsLocale(locale: Locale, module: String): Boolean =
-        getModule(module, locale) != null
+        supportedLocales.contains(locale)
 
     override fun getString(key: String, vararg params: Any, locale: Locale, module: String): String {
-        logger.trace { "Fetching key \"$key\" locale \"$locale\" and module \"$module\"" }
-        val m = getModule(module, locale)
+        val l = if (supportsLocale(locale, module)) locale else defaultLocale
+
+        logger.trace { "Fetching key \"$key\" locale \"$l\" and module \"$module\"" }
+        val m = getModule(module, l)
         if (m == null) {
             logger.warn { "Translation module not found \"$module\"" }
             return key

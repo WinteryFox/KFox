@@ -715,6 +715,7 @@ class KFoxBuilder<T, E : AsKordEvent<T>> internal constructor() {
     lateinit var `package`: String
 
     lateinit var events: (KFox<T, E>) -> SharedFlow<T>
+
     lateinit var mapper: E
 
     var translationProvider: TranslationProvider = ResourceBundleTranslationProvider()
