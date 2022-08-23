@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 val jvmVersion = JavaVersion.VERSION_17
-val kordVersion = "0.8.0-M15"
+val kordVersion = "0.8.0-M16"
 
 plugins {
     kotlin("jvm") version "1.7.10"
