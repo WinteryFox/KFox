@@ -146,7 +146,7 @@ class KFox<T, E : AsKordEvent<T>>(
             .map { it.first to it.second as InteractionCreateEvent }
             .onEach { logger.trace { "Received interaction ${it.second.interaction.id}" } }
             .onEach { (source, event) ->
-                launch(event.coroutineContext) {
+                launch {
                     runCatching {
                         with(event) {
                             when (this) {
