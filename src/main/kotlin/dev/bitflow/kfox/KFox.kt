@@ -12,22 +12,19 @@ import dev.kord.common.entity.Permissions
 import dev.kord.common.entity.Snowflake
 import dev.kord.common.entity.optional.Optional
 import dev.kord.core.Kord
+import dev.kord.core.behavior.interaction.respondEphemeral
+import dev.kord.core.behavior.interaction.response.*
 import dev.kord.core.entity.Attachment
 import dev.kord.core.entity.Role
 import dev.kord.core.entity.User
-import dev.kord.core.entity.interaction.GroupCommand
-import dev.kord.core.entity.interaction.OptionValue
-import dev.kord.core.entity.interaction.ResolvableOptionValue
+import dev.kord.core.entity.interaction.*
 import dev.kord.core.event.Event
 import dev.kord.core.event.interaction.*
 import dev.kord.core.kordLogger
 import dev.kord.rest.builder.interaction.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import mu.KLogger
 import mu.KotlinLogging
 import org.reflections.Reflections
@@ -102,8 +99,8 @@ class KFox<T, E : AsKordEvent<T>>(
                                 function.findAnnotation<Module>()?.module ?: translation.defaultModule
                             )
                         }
-        logger.debug { "Reflection found ${localComponentCallbacks.size} component callbacks." }
-        logger.debug { "Serving ${commands.size} commands." }
+        logger.info { "Reflection found ${localComponentCallbacks.size} component callbacks." }
+        logger.info { "Serving ${commands.size} commands." }
         logger.info { "KFox instance is ready!" }
     }
 
@@ -221,7 +218,7 @@ class KFox<T, E : AsKordEvent<T>>(
                         }
                     }.onFailure {
                         if (it !is KFoxException)
-                            kordLogger.catching(it)
+                            logger.catching(it)
                     }
                 }
             }
@@ -403,31 +400,93 @@ class KFox<T, E : AsKordEvent<T>>(
             for (filter in filters)
                 if (!filter.doFilter(context!!))
                     return
-        callSuspendBy(
-            parameters
-        )
+        try {
+            callSuspendBy(
+                parameters
+            )
+        } catch (_: KFoxException) {
+        } catch (e: Exception) {
+            if (context == null) {
+                logger.catching(e)
+                return
+            }
+
+            val c = "Something went wrong, try again later!" // TODO: Localize
+            when (context) {
+                is PublicChatCommandContext -> (context as PublicChatCommandContext<T>).response.createPublicFollowup {
+                    content = c
+                }
+
+                is PublicModalContext -> (context as PublicModalContext<T>).response.createPublicFollowup {
+                    content = c
+                }
+
+                is PublicButtonContext -> (context as PublicButtonContext<T>).response.createPublicFollowup {
+                    content = c
+                }
+
+                is PublicSelectMenuContext -> (context as PublicSelectMenuContext<T>).response.createPublicFollowup {
+                    content = c
+                }
+
+                is EphemeralChatCommandContext -> (context as EphemeralChatCommandContext<T>).response.createEphemeralFollowup {
+                    content = c
+                }
+
+                is EphemeralModalContext -> (context as EphemeralModalContext<T>).response.createEphemeralFollowup {
+                    content = c
+                }
+
+                is EphemeralButtonContext -> (context as EphemeralButtonContext<T>).response.createEphemeralFollowup {
+                    content = c
+                }
+
+                is EphemeralSelectMenuContext -> (context as EphemeralSelectMenuContext<T>).response.createEphemeralFollowup {
+                    content = c
+                }
+
+                is ChatCommandContext -> (context as ChatCommandContext<T>).event.interaction.respondEphemeral {
+                    content = c
+                }
+
+                is ButtonContext -> (context as ButtonContext<T>).event.interaction.respondEphemeral {
+                    content = c
+                }
+
+                is SelectMenuContext -> (context as SelectMenuContext<T>).event.interaction.respondEphemeral {
+                    content = c
+                }
+
+                is ModalContext -> (context as ModalContext<T>).event.interaction.respondEphemeral {
+                    content = c
+                }
+
+                null -> {}
+            }
+            logger.catching(e)
+        }
+    }
+}
+
+private suspend fun getCallback(
+    logger: KLogger,
+    localComponentCallbacks: Map<String, ComponentCallback>,
+    registry: ComponentRegistry,
+    id: String
+): ComponentCallback? {
+    val callbackId = registry.get(id)
+    if (callbackId == null) {
+        logger.debug { "Callback for component $id is not registered, did you forget to call `register` in the builder?" }
+        return null
     }
 
-    private suspend fun getCallback(
-        logger: KLogger,
-        localComponentCallbacks: Map<String, ComponentCallback>,
-        registry: ComponentRegistry,
-        id: String
-    ): ComponentCallback? {
-        val callbackId = registry.get(id)
-        if (callbackId == null) {
-            logger.debug { "Callback for component $id is not registered, did you forget to call `register` in the builder?" }
-            return null
-        }
-
-        val callback = localComponentCallbacks[callbackId]
-        if (callback == null) {
-            logger.debug { "Callback for component $id is not defined." }
-            return null
-        }
-
-        return callback
+    val callback = localComponentCallbacks[callbackId]
+    if (callback == null) {
+        logger.debug { "Callback for component $id is not defined." }
+        return null
     }
+
+    return callback
 }
 
 fun scanForCommands(translationProvider: TranslationProvider, reflections: Reflections): List<CommandData> {

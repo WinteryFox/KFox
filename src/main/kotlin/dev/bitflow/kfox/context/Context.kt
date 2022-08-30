@@ -112,6 +112,9 @@ sealed class Context<T>(
 
     suspend fun Member.topRole(): Role? = roles.toList().maxByOrNull { it.getPosition() }
 
+    suspend fun Member.isHigherTopRole(other: Member): Boolean =
+        (topRole()?.getPosition() ?: 0) >= (other.topRole()?.getPosition() ?: 0)
+
     suspend inline fun checkPermissions(vararg permissions: Permission) = checkPermissions(permissions.toSet())
 
     suspend inline fun checkPermissions(permissions: Set<Permission>) {
