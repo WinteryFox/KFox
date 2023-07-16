@@ -5,13 +5,6 @@
 
 # KFox
 
-While using Kord, have you ever stopped and thought to yourself; "I wonder how I could add a command
-that adds a button that shows a fox whenever I want." Well dear user, I have!
-To solve this problem I, Amy (ya queen, ya girl), decided to create a library that will let you
-create commands, components and other Discord interactions easily, quickly and effortlessly.
-
-#### Meme over, serious only now
-
 KFox is a Discord interaction library written in Kotlin built on-top of [Kord](https://kord.dev/).
 It will allow you to easily create and respond to any type of interaction that Kord (and by extension Discord) supports.
 
