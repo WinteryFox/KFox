@@ -1,11 +1,10 @@
 <a href=""><img align="right" src="https://zerotwo.bot/logo.webp" width=27%></a>
 
-[![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/ZeroTwo-Bot/KFox/CI/master?logo=github&&style=for-the-badge)](https://github.com/ZeroTwo-Bot/KFox/actions)
-[![Discord](https://img.shields.io/static/v1?label=Discord&message=Click%20here&color=7289DA&style=for-the-badge&logo=discord)](https://zerotwo.link/support)
+[![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/WinteryFox/KFox/CI/master?logo=github&&style=for-the-badge)](https://github.com/WinteryFox/KFox/actions)
 
 # KFox
 
-KFox is a Discord interaction library written in Kotlin built on-top of [Kord](https://kord.dev/).
+KFox is a Discord interaction library written in Kotlin built on-top of [Kord](https://kord.dev/) and originally developed for the big bot [ZeroTwo](https://zerotwo.bot).
 It will allow you to easily create and respond to any type of interaction that Kord (and by extension Discord) supports.
 
 ## Supported interactions
